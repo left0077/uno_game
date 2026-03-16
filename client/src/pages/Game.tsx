@@ -122,34 +122,54 @@ export function Game({
     // 如果被跳过，不能出牌
     if (gameState.skippedPlayerId === currentPlayerId) return new Set<string>();
     
-    // 记录日志帮助调试
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[playableCards] 计算可出牌:', {
-        currentPlayerId,
-        isMyTurn,
-        cardCount: currentPlayer.cards.length,
-        currentColor: gameState.currentColor,
-        topCard: topCard ? { color: topCard.color, value: topCard.value } : null,
-        skippedPlayerId: gameState.skippedPlayerId
-      });
+    // 记录日志帮助调试 - 始终输出到帮助排查
+    console.log('[playableCards] 计算可出牌:', {
+      currentPlayerId,
+      isMyTurn,
+      cardCount: currentPlayer.cards.length,
+      currentColor: gameState.currentColor,
+      topCard: topCard ? { type: topCard.type, color: topCard.color, value: topCard.value, valueType: typeof topCard.value } : null,
+      skippedPlayerId: gameState.skippedPlayerId,
+      pendingDraw: gameState.pendingDraw,
+      myCards: currentPlayer.cards.map(c => ({ id: c.id, type: c.type, color: c.color, value: c.value, valueType: typeof c.value }))
+    });
+    
+    const result = new Set<string>();
+    
+    for (const card of currentPlayer.cards) {
+      let canPlay = false;
+      let reason = '';
+      
+      // 连打规则：如果有待摸牌惩罚，只能出相同类型的+2或+4
+      if (gameState.pendingDraw && gameState.pendingDraw > 0) {
+        if (gameState.pendingDrawType === 'draw2' && card.type === 'draw2') {
+          canPlay = true;
+          reason = 'draw2 stack';
+        } else if (gameState.pendingDrawType === 'draw4' && card.type === 'draw4') {
+          canPlay = true;
+          reason = 'draw4 stack';
+        }
+      } else {
+        // 正常出牌规则
+        if (card.type === 'wild' || card.type === 'draw4') {
+          canPlay = true;
+          reason = 'wild card';
+        } else if (card.color === gameState.currentColor) {
+          canPlay = true;
+          reason = `color match (${card.color} === ${gameState.currentColor})`;
+        } else if (topCard && card.value === topCard.value) {
+          canPlay = true;
+          reason = `value match (${card.value} === ${topCard.value})`;
+        }
+      }
+      
+      if (canPlay) {
+        result.add(card.id);
+        console.log(`[playableCards] 可出: ${card.color} ${card.type} ${card.value} - ${reason}`);
+      }
     }
     
-    return new Set(
-      currentPlayer.cards.filter(card => {
-        // 连打规则：如果有待摸牌惩罚，只能出相同类型的+2或+4
-        if (gameState.pendingDraw && gameState.pendingDraw > 0) {
-          if (gameState.pendingDrawType === 'draw2' && card.type === 'draw2') return true;
-          if (gameState.pendingDrawType === 'draw4' && card.type === 'draw4') return true;
-          return false; // 不能叠加，只能摸牌
-        }
-        
-        // 正常出牌规则
-        if (card.type === 'wild' || card.type === 'draw4') return true;
-        if (card.color === gameState.currentColor) return true;
-        if (topCard && card.value === topCard.value) return true;
-        return false;
-      }).map(c => c.id)
-    );
+    return result;
   }, [currentPlayer, currentPlayer?.cards.length, gameState.currentColor, gameState.pendingDraw, gameState.pendingDrawType, topCard, isMyTurn, gameState.skippedPlayerId, currentPlayerId]);
 
   // 计算可抢牌出的牌（不是自己的回合，且手中有与顶牌完全相同的牌）
@@ -321,24 +341,48 @@ export function Game({
   
   // 执行出牌（点击出牌按钮）
   const handlePlayButton = () => {
+    console.log('[handlePlayButton] 点击出牌按钮:', {
+      selectedCard,
+      selectedComboCards,
+      isOutMode,
+      matchedCombo: matchedCombo?.type,
+      playableCards: Array.from(playableCards),
+      hasPlayable: selectedCard ? playableCards.has(selectedCard) : false
+    });
+    
     // 处理连打出牌（Out模式）- 优先检查是否组成了有效连打
     if (isOutMode && matchedCombo) {
+      console.log('[handlePlayButton] 执行连打:', matchedCombo.type);
       executeCombo(matchedCombo.type as 'pair' | 'three' | 'rainbow' | 'straight');
       return;
     }
     
     // 如果选了多张牌但没有组成连打，显示提示
     if (isOutMode && selectedComboCards.length >= 2) {
+      console.log('[handlePlayButton] 未组成有效连打');
       // 不执行任何操作，UI会显示"无法组成连打"提示
       return;
     }
     
     // 处理单张出牌
     const cardId = selectedCard;
-    if (!cardId || !playableCards.has(cardId)) return;
+    if (!cardId) {
+      console.log('[handlePlayButton] 未选择卡牌');
+      return;
+    }
+    
+    if (!playableCards.has(cardId)) {
+      console.log('[handlePlayButton] 卡牌不可出:', cardId);
+      return;
+    }
     
     const card = currentPlayer?.cards.find(c => c.id === cardId);
-    if (!card) return;
+    if (!card) {
+      console.log('[handlePlayButton] 找不到卡牌:', cardId);
+      return;
+    }
+    
+    console.log('[handlePlayButton] 出牌:', { id: card.id, color: card.color, type: card.type, value: card.value });
     
     // 万能牌需要选颜色
     if (card.type === 'wild' || card.type === 'draw4') {
@@ -850,15 +894,25 @@ export function Game({
           {/* 出牌按钮 */}
           <button
             onClick={handlePlayButton}
-            disabled={!selectedCard}
+            disabled={!selectedCard || (isOutMode && selectedComboCards.length >= 2 && !matchedCombo)}
             className={`px-8 py-3 rounded-lg font-bold text-lg transition-all ${
-              selectedCard
-                ? 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-600/25'
-                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+              // 无效连打状态 - 红色警告
+              isOutMode && selectedComboCards.length >= 2 && !matchedCombo
+                ? 'bg-red-600/50 text-red-200 cursor-not-allowed border-2 border-red-500 animate-pulse'
+                // 正常可出牌状态
+                : selectedCard
+                  ? 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-600/25'
+                  // 未选择卡牌状态
+                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
             }`}
           >
-            {selectedComboCards.length >= 2 ? `出${selectedComboCards.length}张` : 
-             selectedCard ? '出牌' : '选择卡牌'}
+            {isOutMode && selectedComboCards.length >= 2 && !matchedCombo
+              ? '❌ 无法组成连打'
+              : selectedComboCards.length >= 2 
+                ? `出${selectedComboCards.length}张`
+                : selectedCard 
+                  ? '出牌' 
+                  : '选择卡牌'}
           </button>
         </div>
       </div>

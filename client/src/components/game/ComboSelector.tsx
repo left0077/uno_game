@@ -49,20 +49,17 @@ export function ComboSelector({
         >
           {matchedCombo.name} ✓
         </button>
-      ) : selectedCards.length >= 2 ? (
-        /* 选牌但无法组成连打 */
-        <span className="px-3 py-1.5 rounded-lg text-sm text-yellow-400 bg-yellow-500/20 border border-yellow-500/50">
-          无法组成连打
-        </span>
       ) : null}
 
-      {/* 取消选择按钮 */}
-      <button
-        onClick={onCancel}
-        className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-      >
-        取消
-      </button>
+      {/* 取消选择按钮 - 仅在已选牌时显示 */}
+      {selectedCards.length > 0 && (
+        <button
+          onClick={onCancel}
+          className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+        >
+          取消
+        </button>
+      )}
     </div>
   );
 }
