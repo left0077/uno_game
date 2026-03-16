@@ -18,7 +18,7 @@
     "test:card": "cd server && node test-card.mjs",
     "test:room": "cd server && node test-room.mjs",
     "test:game": "cd server && node test-game.mjs",
-    "test:client": "cd client && npm run build",
+    "test:client": "cd client && npm run test:unit",
     "test:all": "npm run test && npm run test:e2e"
   },
   "devDependencies": {

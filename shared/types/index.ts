@@ -81,11 +81,15 @@ export interface GameState {
 
 // 游戏动作
 export interface GameAction {
-  type: 'play' | 'draw' | 'skip' | 'uno' | 'challenge' | 'jumpIn';
+  type: 'play' | 'draw' | 'skip' | 'uno' | 'challenge' | 'jumpIn' | 'combo';
   playerId: string;
   card?: Card;
   cards?: Card[];
+  cardIds?: string[]; // 连打时使用的牌ID列表
   color?: string;
+  chosenColor?: string; // 万能牌选择的颜色
+  comboType?: 'pair' | 'three' | 'rainbow' | 'straight'; // 连打类型
+  targetId?: string; // 彩虹转移的目标玩家ID
   timestamp: number;
 }
 

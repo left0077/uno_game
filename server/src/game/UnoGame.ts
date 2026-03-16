@@ -1,11 +1,12 @@
 import { Room, Player, GameState, GameAction, Card } from '../shared/index.js';
 import { GameMode, GameModeFactory } from './modes/GameMode.js';
-import { StandardMode } from './modes/StandardMode.js';
-import { OutMode } from './modes/OutMode.js';
-import { AIPlayer } from './AIPlayer.js';
+import { AIPlayer } from './ai/index.js';
 
 // 注册游戏模式
-GameModeFactory.register('standard', StandardMode);
+import { BaseGameMode } from './modes/BaseGameMode.js';
+import { OutMode } from './modes/OutMode.js';
+
+GameModeFactory.register('standard', BaseGameMode);
 GameModeFactory.register('out', OutMode);
 
 export interface GameCallbacks {
@@ -41,14 +42,12 @@ export class UnoGame {
     
     // 支持两种构造函数签名
     if (typeof callbacksOrStateChange === 'function') {
-      // 旧版签名：UnoGame(room, onStateChange, onGameEnd, onSendMessage)
       this.callbacks = {
         onStateChange: callbacksOrStateChange,
         onGameEnd: onGameEnd || (() => {}),
         onSendMessage
       };
     } else {
-      // 新版签名：UnoGame(room, callbacks)
       this.callbacks = callbacksOrStateChange;
     }
     
@@ -127,12 +126,18 @@ export class UnoGame {
    * 检查胜利条件
    */
   private checkWinCondition(): void {
+    // 防止重复触发游戏结束
+    if (this.gameState.isRoundEnded || this.gameState.winner) {
+      return;
+    }
+    
     const winnerId = this.mode.checkWinCondition(this.gameState);
     
     if (winnerId) {
       const winner = this.room.players.find(p => p.id === winnerId);
       if (winner) {
         this.gameState.winner = winnerId;
+        this.gameState.isRoundEnded = true;
         this.room.status = 'finished';
         this.callbacks.onGameEnd(winner);
         this.destroy();
@@ -142,6 +147,8 @@ export class UnoGame {
   
   /**
    * 回合超时处理
+   * 
+   * 重要：超时后自动进入托管模式，防止游戏卡住
    */
   private handleTurnTimeout(): void {
     const currentPlayer = this.gameState.players.find(
@@ -152,16 +159,24 @@ export class UnoGame {
       return;
     }
     
-    console.log(`[UnoGame] 玩家 ${currentPlayer.nickname} 回合超时`);
+    // 如果已经是AI托管状态，不需要重复处理
+    if (currentPlayer.isAI) {
+      return;
+    }
     
-    // 自动摸牌
-    const drawAction: GameAction = {
-      type: 'draw',
-      playerId: currentPlayer.id,
-      timestamp: Date.now()
-    };
+    console.log(`[UnoGame] 玩家 ${currentPlayer.nickname} 回合超时，自动进入托管模式`);
     
-    this.handleAction(drawAction, currentPlayer.id);
+    // 自动开启托管模式
+    currentPlayer.isAI = true;
+    currentPlayer.aiType = 'host';
+    
+    // 通知所有玩家该玩家已进入托管模式
+    this.callbacks.onStateChange(this.gameState);
+    
+    // 触发AI出牌
+    setTimeout(() => {
+      this.checkAndHandleAITurn();
+    }, 500);
   }
   
   /**
@@ -170,7 +185,7 @@ export class UnoGame {
   private startTurnTimer(): void {
     this.clearTurnTimer();
     
-    const turnTime = this.gameState.turnTimer * 1000; // 转为毫秒
+    const turnTime = this.gameState.turnTimer * 1000;
     this.turnTimer = setInterval(() => {
       const elapsed = Date.now() - this.gameState.turnStartTime;
       if (elapsed >= turnTime) {
@@ -192,8 +207,10 @@ export class UnoGame {
   
   /**
    * 检查并处理AI回合
+   * 
+   * 公共方法，允许外部调用（如托管切换时）
    */
-  private checkAndHandleAITurn(): void {
+  public checkAndHandleAITurn(): void {
     const currentPlayer = this.gameState.players.find(
       p => p.id === this.gameState.currentPlayerId
     );
@@ -206,7 +223,6 @@ export class UnoGame {
     const delay = currentPlayer.aiType === 'host' ? 1500 : 1000;
     
     setTimeout(() => {
-      // 再次检查状态（可能已经被其他操作改变了）
       if (this.gameState.currentPlayerId !== currentPlayer.id) return;
       
       const action = AIPlayer.getAIAction(
@@ -216,21 +232,7 @@ export class UnoGame {
       );
       
       if (action) {
-        if (action.type === 'play' && action.cardId) {
-          this.handleAction({
-            type: 'play',
-            playerId: currentPlayer.id,
-            cardIds: [action.cardId],
-            chosenColor: action.chosenColor,
-            timestamp: Date.now()
-          }, currentPlayer.id);
-        } else if (action.type === 'draw') {
-          this.handleAction({
-            type: 'draw',
-            playerId: currentPlayer.id,
-            timestamp: Date.now()
-          }, currentPlayer.id);
-        }
+        this.handleAction(action, currentPlayer.id);
       }
     }, delay);
   }
@@ -268,42 +270,8 @@ export class UnoGame {
     console.log('[UnoGame] 游戏已销毁');
   }
   
-  /**
-   * 处理机器人回合（供SocketHandler调用）
-   */
-  handleBotTurn(player: Player): void {
-    if (!player.isAI || player.eliminated) return;
-    
-    const action = AIPlayer.getAIAction(
-      player,
-      this.gameState,
-      this.gameState.players
-    );
-    
-    if (action) {
-      if (action.type === 'play' && action.cardId) {
-        this.handleAction({
-          type: 'play',
-          playerId: player.id,
-          cardIds: [action.cardId],
-          chosenColor: action.chosenColor,
-          timestamp: Date.now()
-        }, player.id);
-      } else if (action.type === 'draw') {
-        this.handleAction({
-          type: 'draw',
-          playerId: player.id,
-          timestamp: Date.now()
-        }, player.id);
-      }
-    }
-  }
+  // ============ 兼容层方法 ============
   
-  // ============ 兼容层方法（测试使用） ============
-  
-  /**
-   * 出牌（兼容旧API）
-   */
   playCard(playerId: string, cardId: string, chosenColor?: string): boolean {
     return this.handleAction({
       type: 'play',
@@ -314,10 +282,6 @@ export class UnoGame {
     }, playerId);
   }
   
-  /**
-   * 摸牌（兼容旧API）
-   * @returns 摸到的牌数组
-   */
   drawCards(playerId: string, count?: number): Card[] {
     const success = this.handleAction({
       type: 'draw',
@@ -326,7 +290,6 @@ export class UnoGame {
     }, playerId);
     
     if (success) {
-      // 返回玩家最新摸到的牌
       const player = this.gameState.players.find(p => p.id === playerId);
       if (player) {
         const actualCount = count || 1;
@@ -337,9 +300,6 @@ export class UnoGame {
     return [];
   }
   
-  /**
-   * 喊UNO（兼容旧API）
-   */
   callUno(playerId: string): boolean {
     return this.handleAction({
       type: 'uno',
@@ -348,9 +308,6 @@ export class UnoGame {
     }, playerId);
   }
   
-  /**
-   * 质疑UNO（兼容旧API）
-   */
   challengeUno(playerId: string, targetId: string): { success: boolean; message?: string } {
     const success = this.handleAction({
       type: 'challenge',
@@ -361,9 +318,6 @@ export class UnoGame {
     return { success };
   }
   
-  /**
-   * 抢牌出（兼容旧API）
-   */
   jumpIn(playerId: string, cardId: string): boolean {
     return this.handleAction({
       type: 'jumpIn',
@@ -373,19 +327,12 @@ export class UnoGame {
     }, playerId);
   }
   
-  /**
-   * 获取当前玩家（兼容旧API）
-   */
   getCurrentPlayer(): Player | undefined {
     return this.gameState.players.find(p => p.id === this.gameState.currentPlayerId);
   }
   
-  /**
-   * 结束游戏（兼容旧API）
-   */
   endGame(winner?: Player): void {
     if (winner) {
-      // 添加到排名
       if (!this.gameState.rankings) this.gameState.rankings = [];
       if (!this.gameState.rankings.includes(winner.id)) {
         this.gameState.rankings.push(winner.id);

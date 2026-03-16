@@ -461,7 +461,7 @@ export function setupSocketHandlers(io: Server): void {
         const game = activeGames.get(data.roomCode);
         if (game) {
           setTimeout(() => {
-            (game as any).handleBotTurn?.(player);
+            game.checkAndHandleAITurn();
           }, 500);
         }
       }

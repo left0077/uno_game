@@ -424,16 +424,20 @@ export function Room({
               <div>
                 <h3 className="text-lg font-semibold text-red-400 mb-3 flex items-center gap-2">
                   <span className="w-6 h-6 rounded bg-red-600 text-white text-xs flex items-center justify-center">Out</span>
-                  Out 模式（缩圈模式）
+                  Out 模式（大逃杀模式）
                 </h3>
                 <ul className="space-y-2 text-sm text-slate-300">
                   <li className="flex gap-2">
                     <span className="text-red-500">•</span>
-                    <span><strong className="text-white">三阶段缩圈：</strong>游戏开始15分钟→上限15张，18分钟→上限8张，21分钟→上限3张</span>
+                    <span><strong className="text-white">手牌上限：</strong>固定20张，手牌数&gt;20时立即被淘汰（摸牌后、获得惩罚后实时检查）</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="text-red-500">•</span>
-                    <span><strong className="text-white">淘汰机制：</strong>手牌超过上限时立即被淘汰</span>
+                    <span><strong className="text-white">反转反击：</strong>当惩罚牌(+2/+4/+惩罚卡)累积时，打出反转牌可将累积惩罚转移给上一个出+牌的玩家</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-red-500">•</span>
+                    <span><strong className="text-white">阶段推进：</strong>游戏进行3-4分钟后注入+3牌，5-7分钟后注入+5牌，6-10分钟后注入+8牌</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="text-red-500">•</span>
@@ -441,11 +445,11 @@ export function Room({
                   </li>
                   <li className="flex gap-2">
                     <span className="text-red-500">•</span>
-                    <span><strong className="text-white">彩虹转移：</strong>彩虹牌可将累积的惩罚转移给指定玩家</span>
+                    <span><strong className="text-white">彩虹转移：</strong>彩虹牌可将累积的惩罚(+3)转移给指定玩家，被指定玩家可用反转弹回</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="text-red-500">•</span>
-                    <span><strong className="text-white">惩罚卡：</strong>Out阶段会往牌堆注入+3、+5、+8等惩罚卡</span>
+                    <span><strong className="text-white">胜利条件：</strong>按出完手牌顺序排名，只剩1人未被淘汰时此人获胜，20分钟超时按手牌最少者获胜</span>
                   </li>
                 </ul>
               </div>

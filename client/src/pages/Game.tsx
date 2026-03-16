@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Users, ArrowRight, Volume2, VolumeX, LogOut, Trophy, Ban } from 'lucide-react';
 import { Card, ColorPicker } from '../components/Card';
+import { OutStatus, ComboSelector, TargetSelector } from '../components/game';
+import { useGameMode } from '../core/hooks/useGameMode';
 import type { Room, GameState, Card as CardType, Player, ChatMessage } from '../../../shared/types';
 
 interface GameProps {
@@ -43,8 +45,8 @@ export function Game({
   const [skipNotification, setSkipNotification] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   const lastSkippedIdRef = useRef<string | null>(null); // 防止重复显示跳过提示
   
-  // Out倒计时
-  const [outCountdown, setRingCountdown] = useState<number>(0);
+  // 使用useGameMode Hook获取游戏模式相关状态和逻辑
+  const { isOutMode, availableCombos, outCountdown } = useGameMode(room, gameState);
   
   // 回合倒计时（动态计算）
   const [turnCountdown, setTurnCountdown] = useState<number>(gameState.turnTimer);
@@ -78,23 +80,23 @@ export function Game({
     return () => clearInterval(timer);
   }, [gameState.turnStartTime, gameState.turnTimer]);
   
-  // 更新Out倒计时
+  // Out倒计时现在由useGameMode Hook提供
+  
+  // 当回合切换或游戏状态重置时，清除选择状态
   useEffect(() => {
-    if (!gameState.outState || gameState.outState.phase >= 3) {
-      setRingCountdown(0);
-      return;
+    // 回合切换到其他玩家时，清除自己的选择
+    if (!isMyTurn) {
+      setSelectedCard(null);
+      setSelectedComboCards([]);
     }
-    
-    const updateCountdown = () => {
-      const now = Date.now();
-      const remaining = Math.max(0, gameState.outState!.nextOutAt - now);
-      setRingCountdown(remaining);
-    };
-    
-    updateCountdown();
-    const timer = setInterval(updateCountdown, 1000);
-    return () => clearInterval(timer);
-  }, [gameState.outState]);
+    // 游戏重新开始时，重置所有状态
+    if (gameState.isRoundEnded) {
+      setSelectedCard(null);
+      setSelectedComboCards([]);
+      setPendingCard(null);
+      setShowColorPicker(false);
+    }
+  }, [isMyTurn, gameState.isRoundEnded]);
   
   // 获取其他玩家（按顺序）- 优先从 gameState 获取
   const allPlayers = gameState.players || room.players;
@@ -114,7 +116,23 @@ export function Game({
 
   // 计算可出牌
   const playableCards = useMemo(() => {
-    if (!currentPlayer || !isMyTurn) return new Set<string>();
+    // 必须是自己回合且玩家存在
+    if (!isMyTurn || !currentPlayer) return new Set<string>();
+    
+    // 如果被跳过，不能出牌
+    if (gameState.skippedPlayerId === currentPlayerId) return new Set<string>();
+    
+    // 记录日志帮助调试
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[playableCards] 计算可出牌:', {
+        currentPlayerId,
+        isMyTurn,
+        cardCount: currentPlayer.cards.length,
+        currentColor: gameState.currentColor,
+        topCard: topCard ? { color: topCard.color, value: topCard.value } : null,
+        skippedPlayerId: gameState.skippedPlayerId
+      });
+    }
     
     return new Set(
       currentPlayer.cards.filter(card => {
@@ -132,7 +150,7 @@ export function Game({
         return false;
       }).map(c => c.id)
     );
-  }, [currentPlayer, gameState.currentColor, gameState.pendingDraw, gameState.pendingDrawType, topCard, isMyTurn]);
+  }, [currentPlayer, currentPlayer?.cards.length, gameState.currentColor, gameState.pendingDraw, gameState.pendingDrawType, topCard, isMyTurn, gameState.skippedPlayerId, currentPlayerId]);
 
   // 计算可抢牌出的牌（不是自己的回合，且手中有与顶牌完全相同的牌）
   const jumpInCards = useMemo(() => {
@@ -149,6 +167,31 @@ export function Game({
       }).map(c => c.id)
     );
   }, [currentPlayer, isMyTurn, room.settings.allowJumpIn, topCard]);
+  
+  // 计算是否应该显示"无牌可出"提示
+  const shouldShowNoCardHint = useMemo(() => {
+    const shouldShow = isMyTurn && 
+      currentPlayer && 
+      currentPlayer.cards.length > 0 && 
+      playableCards.size === 0 && 
+      !gameState.pendingDraw && 
+      gameState.skippedPlayerId !== currentPlayerId;
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[shouldShowNoCardHint]', {
+        shouldShow,
+        isMyTurn,
+        hasCurrentPlayer: !!currentPlayer,
+        cardCount: currentPlayer?.cards.length,
+        playableCardsSize: playableCards.size,
+        pendingDraw: gameState.pendingDraw,
+        skippedPlayerId: gameState.skippedPlayerId,
+        currentPlayerId
+      });
+    }
+    
+    return shouldShow;
+  }, [isMyTurn, currentPlayer, playableCards.size, gameState.pendingDraw, gameState.skippedPlayerId, currentPlayerId]);
 
   // 智能排序手牌（可出牌在前）
   const sortedHand = useMemo(() => {
@@ -168,71 +211,41 @@ export function Game({
     });
   }, [currentPlayer, playableCards]);
 
-  // 检测可用的连打组合（Out模式）
-  const availableCombos = useMemo(() => {
-    if (!currentPlayer || !isMyTurn || room.settings.mode !== 'out') return [];
+  // 连打组合现在由useGameMode Hook提供
+  
+  // 根据当前选中的牌，找出可以组成的连打
+  const matchedCombo = useMemo(() => {
+    if (selectedComboCards.length < 2) return null;
     
-    const combos: Array<{type: 'pair' | 'three' | 'rainbow' | 'straight'; cardIds: string[]}> = [];
-    const cards = currentPlayer.cards.filter(c => c.type === 'number' && typeof c.value === 'number');
+    // 查找完全匹配的组合（牌数相同且所有牌都在选中列表中）
+    return availableCombos.find(c => 
+      c.cardIds.length === selectedComboCards.length &&
+      c.cardIds.every(id => selectedComboCards.includes(id))
+    );
+  }, [availableCombos, selectedComboCards]);
+  
+  // 计算可以继续选择的牌（用于连打提示）
+  const suggestedComboCards = useMemo(() => {
+    if (selectedComboCards.length === 0) return new Set<string>();
+    if (matchedCombo) return new Set<string>(); // 已完成匹配，不需要提示
     
-    // 按数字分组
-    const byNumber = new Map<number, typeof cards>();
-    const byColor = new Map<string, typeof cards>();
+    const suggestions = new Set<string>();
     
-    for (const card of cards) {
-      const numValue = card.value as number;
-      if (!byNumber.has(numValue)) byNumber.set(numValue, []);
-      byNumber.get(numValue)!.push(card);
-      
-      if (card.color) {
-        if (!byColor.has(card.color)) byColor.set(card.color, []);
-        byColor.get(card.color)!.push(card);
-      }
-    }
-    
-    // 检测对子、三条、彩虹
-    for (const [, cardList] of byNumber) {
-      if (cardList.length >= 4) {
-        const colors = new Set(cardList.map(c => c.color));
-        if (colors.size === 4) {
-          const rainbowCards = cardList.filter((c, i, arr) => 
-            arr.findIndex(x => x.color === c.color) === i
-          );
-          combos.push({ type: 'rainbow', cardIds: rainbowCards.map(c => c.id) });
-        }
-      }
-      if (cardList.length >= 3) {
-        combos.push({ type: 'three', cardIds: cardList.slice(0, 3).map(c => c.id) });
-      }
-      if (cardList.length >= 2) {
-        combos.push({ type: 'pair', cardIds: cardList.slice(0, 2).map(c => c.id) });
-      }
-    }
-    
-    // 检测顺子
-    for (const [, cardList] of byColor) {
-      const sorted = [...cardList].sort((a, b) => ((a.value as number) || 0) - ((b.value as number) || 0));
-      let sequence: typeof cards = [];
-      
-      for (const card of sorted) {
-        const cardValue = (card.value as number) || 0;
-        const lastValue = (sequence[sequence.length - 1]?.value as number) || 0;
-        if (sequence.length === 0 || cardValue === lastValue + 1) {
-          sequence.push(card);
-        } else {
-          if (sequence.length >= 3) {
-            combos.push({ type: 'straight', cardIds: sequence.map(c => c.id) });
+    // 查找包含已选牌的部分匹配组合
+    for (const combo of availableCombos) {
+      const hasSelectedCard = combo.cardIds.some(id => selectedComboCards.includes(id));
+      if (hasSelectedCard) {
+        // 如果组合中还有其他未选中的牌，提示它们
+        for (const id of combo.cardIds) {
+          if (!selectedComboCards.includes(id)) {
+            suggestions.add(id);
           }
-          sequence = [card];
         }
-      }
-      if (sequence.length >= 3) {
-        combos.push({ type: 'straight', cardIds: sequence.map(c => c.id) });
       }
     }
     
-    return combos;
-  }, [currentPlayer, isMyTurn, room.settings.mode]);
+    return suggestions;
+  }, [availableCombos, selectedComboCards, matchedCombo]);
 
   // 检查是否需要喊UNO（出牌后只剩1张牌时立即显示）
   useEffect(() => {
@@ -252,6 +265,12 @@ export function Game({
       setSkipNotification({ show: true, message: '🚫 你被跳过了！' });
     }
     
+    // 当 skippedPlayerId 被清除时（undefined），也清除提示
+    if (!gameState.skippedPlayerId && skipNotification.show) {
+      setSkipNotification({ show: false, message: '' });
+      lastSkippedIdRef.current = null;
+    }
+    
     // 轮到自己出牌时自动消除提示
     if (isMyTurn && skipNotification.show) {
       setSkipNotification({ show: false, message: '' });
@@ -265,15 +284,15 @@ export function Game({
     if (!isMyTurn && jumpInCards.has(card.id) && onJumpIn) {
       onJumpIn(card.id);
       setSelectedCard(null);
+      setSelectedComboCards([]);
       return;
     }
     
     // 只能选可出的牌
     if (!isMyTurn || !playableCards.has(card.id)) return;
     
-    // Out模式：支持多选（连打）
-    if (room.settings.mode === 'out' && card.type === 'number') {
-      // 切换选择状态
+    // Out模式：支持多选（连打），但只能选数字牌
+    if (isOutMode && card.type === 'number') {
       setSelectedComboCards(prev => {
         if (prev.includes(card.id)) {
           // 取消选中
@@ -290,27 +309,28 @@ export function Game({
       return;
     }
     
-    // 标准模式：单选
+    // 非数字牌或标准模式：单选，清空连打选择
     if (selectedCard === card.id) {
-      // 取消选中
       setSelectedCard(null);
+      setSelectedComboCards([]);
     } else {
-      // 选中
       setSelectedCard(card.id);
+      setSelectedComboCards([]);
     }
   };
   
   // 执行出牌（点击出牌按钮）
   const handlePlayButton = () => {
-    // 处理连打出牌（Out模式）
-    if (room.settings.mode === 'out' && selectedComboCards.length >= 2) {
-      const combo = availableCombos.find(c => 
-        c.cardIds.every(id => selectedComboCards.includes(id))
-      );
-      if (combo) {
-        executeCombo(combo.type);
-        return;
-      }
+    // 处理连打出牌（Out模式）- 优先检查是否组成了有效连打
+    if (isOutMode && matchedCombo) {
+      executeCombo(matchedCombo.type as 'pair' | 'three' | 'rainbow' | 'straight');
+      return;
+    }
+    
+    // 如果选了多张牌但没有组成连打，显示提示
+    if (isOutMode && selectedComboCards.length >= 2) {
+      // 不执行任何操作，UI会显示"无法组成连打"提示
+      return;
     }
     
     // 处理单张出牌
@@ -335,7 +355,7 @@ export function Game({
   
   // 执行连打
   const executeCombo = (comboType: 'pair' | 'three' | 'rainbow' | 'straight') => {
-    if (!onPlayCombo || selectedComboCards.length === 0) return;
+    if (!onPlayCombo || !matchedCombo) return;
     
     // 彩虹需要选择目标
     if (comboType === 'rainbow') {
@@ -344,15 +364,17 @@ export function Game({
       return;
     }
     
-    onPlayCombo(comboType, selectedComboCards);
+    onPlayCombo(comboType, matchedCombo.cardIds);
     setSelectedComboCards([]);
+    setSelectedCard(null);
   };
   
   // 选择彩虹目标
   const handleTargetSelect = (targetId: string) => {
-    if (pendingComboType === 'rainbow' && onPlayCombo) {
-      onPlayCombo('rainbow', selectedComboCards, targetId);
+    if (pendingComboType === 'rainbow' && onPlayCombo && matchedCombo) {
+      onPlayCombo('rainbow', matchedCombo.cardIds, targetId);
       setSelectedComboCards([]);
+      setSelectedCard(null);
       setPendingComboType(null);
       setShowTargetSelector(false);
     }
@@ -427,36 +449,13 @@ export function Game({
             {formatTime(turnCountdown)}
           </div>
           
-          {/* Out倒计时 */}
-          {gameState.outState && gameState.outState.phase < 3 && outCountdown > 0 && (
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold ${
-              outCountdown <= 30000 
-                ? 'bg-red-600/30 text-red-400 border border-red-500/50 animate-pulse' 
-                : outCountdown <= 60000 
-                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                : 'bg-slate-800 text-slate-300'
-            }`}>
-              <span className="text-xs">🔥</span>
-              <span className="text-sm font-mono">{formatTime(Math.floor(outCountdown / 1000))}</span>
-            </div>
-          )}
-          
-          {/* Out阶段指示 */}
-          {gameState.outState && gameState.outState.phase > 0 && (
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold ${
-              gameState.outState.phase === 1 
-                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                : gameState.outState.phase === 2 
-                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                : 'bg-purple-600/30 text-purple-400 border border-purple-500/50 animate-pulse'
-            }`}>
-              <span className="text-xs">
-                {gameState.outState.phase === 1 ? '🔥 Out I - 上限15张' : 
-                 gameState.outState.phase === 2 ? '🔥🔥 Out II - 上限8张' : 
-                 '💀 终极圈 - 上限3张'}
-              </span>
-              <span className="text-xs text-red-400 font-bold">超出即淘汰！</span>
-            </div>
+          {/* Out模式状态栏 */}
+          {isOutMode && gameState.outState && (
+            <OutStatus
+              phase={gameState.outState.phase}
+              countdown={outCountdown}
+              maxCards={gameState.outState.maxCards}
+            />
           )}
 
           {/* 方向指示 - 更明显的版本 */}
@@ -719,49 +718,24 @@ export function Game({
             {playableCards.size > 0 && (
               <span className="ml-1 text-green-400">({playableCards.size}可出)</span>
             )}
-            {room.settings.mode === 'out' && selectedComboCards.length > 0 && (
+            {isOutMode && selectedComboCards.length > 0 && (
               <span className="ml-1 text-blue-400">(已选{selectedComboCards.length}张)</span>
             )}
           </div>
           
-          {/* 连打按钮（Out模式） */}
-          {room.settings.mode === 'out' && isMyTurn && availableCombos.length > 0 && (
-            <div className="flex items-center gap-2 ml-4">
-              {availableCombos
-                .filter((combo, index, self) => 
-                  index === self.findIndex(c => c.type === combo.type)
-                )
-                .map(combo => {
-                  const isSelected = selectedComboCards.length > 0 && 
-                    combo.cardIds.every(id => selectedComboCards.includes(id));
-                  return (
-                    <button
-                      key={combo.type}
-                      onClick={() => isSelected && executeCombo(combo.type)}
-                      disabled={!isSelected}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-blue-600/25'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}
-                      title={`选择${combo.type === 'pair' ? '对子' : combo.type === 'three' ? '三条' : combo.type === 'rainbow' ? '彩虹' : '顺子'}所需的牌`}
-                    >
-                      {combo.type === 'pair' && '对子'}
-                      {combo.type === 'three' && '三条'}
-                      {combo.type === 'rainbow' && '🌈 彩虹'}
-                      {combo.type === 'straight' && '顺子'}
-                    </button>
-                  );
-                })}
-              {/* 取消选择按钮 */}
-              {selectedComboCards.length > 0 && (
-                <button
-                  onClick={() => setSelectedComboCards([])}
-                  className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                >
-                  取消
-                </button>
-              )}
+          {/* 连打区域（Out模式） */}
+          {isOutMode && isMyTurn && (
+            <div className="ml-4">
+              <ComboSelector
+                combos={availableCombos}
+                selectedCards={selectedComboCards}
+                matchedCombo={matchedCombo}
+                onExecuteCombo={() => matchedCombo && executeCombo(matchedCombo.type as 'pair' | 'three' | 'rainbow' | 'straight')}
+                onCancel={() => {
+                  setSelectedComboCards([]);
+                  setSelectedCard(null);
+                }}
+              />
             </div>
           )}
         </div>
@@ -785,8 +759,8 @@ export function Game({
           )}
         </AnimatePresence>
 
-        {/* 无牌可出提示 - 移到牌堆上方 */}
-        {isMyTurn && playableCards.size === 0 && (
+        {/* 无牌可出提示 - 使用useMemo确保正确更新 */}
+        {shouldShowNoCardHint && (
           <div className="absolute left-1/2 -translate-x-1/2 bottom-[280px] z-30">
             <div className="inline-block px-4 py-2 bg-yellow-500/20 border-2 border-yellow-500 rounded-lg animate-pulse">
               <span className="text-lg font-bold text-yellow-400">👆 无牌可出，点击牌堆摸牌</span>
@@ -801,14 +775,19 @@ export function Game({
             const canJumpIn = jumpInCards.has(card.id);
             const isSelected = selectedCard === card.id;
             // Out模式连打选择
-            const isComboSelected = room.settings.mode === 'out' && selectedComboCards.includes(card.id);
+            const isComboSelected = isOutMode && selectedComboCards.includes(card.id);
+            // 连打提示：已选一些牌，这张牌可以与之组成连打
+            const isComboHint = isOutMode && 
+              selectedComboCards.length > 0 && 
+              suggestedComboCards.has(card.id) &&
+              !isComboSelected;
             
             return (
               <div
                 onClick={() => handleCardClick(card)}
                 className={`
                   relative flex-shrink-0 transition-all duration-200
-                  ${isSelected || isComboSelected ? 'z-10 -translate-y-3' : 'z-0'}
+                  ${isSelected || isComboSelected ? 'z-10 -translate-y-3' : isComboHint ? 'z-5 -translate-y-1' : 'z-0'}
                   ${!isPlayable && !canJumpIn ? 'opacity-50 brightness-75' : 'cursor-pointer'}
                 `}
               >
@@ -818,6 +797,16 @@ export function Game({
                     <span className="text-white text-xs font-bold">✓</span>
                   </div>
                 )}
+                {/* 连打提示标记 */}
+                {isComboHint && (
+                  <div className="absolute -top-2 -left-2 w-5 h-5 bg-purple-500/70 rounded-full shadow-lg border border-white/50 flex items-center justify-center z-15">
+                    <span className="text-white text-[10px]">+</span>
+                  </div>
+                )}
+                {/* 连打提示发光效果 */}
+                {isComboHint && (
+                  <div className="absolute inset-0 rounded-lg ring-2 ring-purple-500/50 ring-offset-2 ring-offset-slate-900 animate-pulse pointer-events-none" />
+                )}
                 <Card
                   card={card}
                   size="md"
@@ -826,7 +815,7 @@ export function Game({
                   disabled={!isPlayable && !canJumpIn}
                 />
                 {/* 可出牌标记（自己回合） */}
-                {isPlayable && isMyTurn && room.settings.mode !== 'out' && (
+                {isPlayable && isMyTurn && !isOutMode && (
                   <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full animate-pulse shadow-lg border-2 border-white ${
                     gameState.pendingDraw && (card.type === 'draw2' || card.type === 'draw4') ? 'bg-red-500 shadow-red-500/50' : 'bg-green-500 shadow-green-500/50'
                   }`} />
@@ -890,51 +879,12 @@ export function Game({
       {/* 彩虹目标选择弹窗 */}
       <AnimatePresence>
         {showTargetSelector && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
-            onClick={() => setShowTargetSelector(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-2xl max-w-md w-full mx-4"
-              onClick={e => e.stopPropagation()}
-            >
-              <h3 className="text-xl font-bold text-white mb-2 text-center">🌈 选择彩虹目标</h3>
-              <p className="text-slate-400 text-center mb-6">选择一名玩家承受 +3 惩罚</p>
-              
-              <div className="grid grid-cols-2 gap-3">
-                {otherPlayers.filter(p => !p.eliminated).map(player => (
-                  <button
-                    key={player.id}
-                    onClick={() => handleTargetSelect(player.id)}
-                    className="flex items-center gap-3 p-3 bg-slate-700 hover:bg-slate-600 rounded-xl transition-colors"
-                  >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                      player.isAI ? 'bg-purple-600/30 text-purple-400' : 'bg-slate-600'
-                    }`}>
-                      {player.isAI ? '🤖' : player.nickname.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium text-white truncate max-w-[100px]">{player.nickname}</div>
-                      <div className="text-xs text-slate-400">{player.cardCount}张牌</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              
-              <button
-                onClick={() => setShowTargetSelector(false)}
-                className="w-full mt-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors"
-              >
-                取消
-              </button>
-            </motion.div>
-          </motion.div>
+          <TargetSelector
+            players={gameState.players || room.players}
+            currentPlayerId={currentPlayerId}
+            onSelect={handleTargetSelect}
+            onCancel={() => setShowTargetSelector(false)}
+          />
         )}
       </AnimatePresence>
     </div>

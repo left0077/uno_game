@@ -75,6 +75,18 @@ else
 fi
 cd ..
 
+# 6. 客户端单元测试
+echo ""
+echo "🧪 6. 客户端单元测试..."
+cd client
+if npm run test:unit > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ 客户端单元测试通过${NC}"
+else
+    echo -e "${RED}❌ 客户端单元测试失败${NC}"
+    FAILED=1
+fi
+cd ..
+
 # 总结
 echo ""
 echo "=========================================="

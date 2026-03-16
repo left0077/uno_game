@@ -1,6 +1,6 @@
 // CardManager 测试
-import { CardManager } from '../game/Card.js';
-import type { Card } from '../shared/types.js';
+import { CardManager } from '../../../game/Card.js';
+import type { Card } from '../../../shared/index.js';
 
 console.log('🧪 CardManager 测试\n');
 
