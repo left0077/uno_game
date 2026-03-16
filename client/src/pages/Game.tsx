@@ -66,9 +66,6 @@ export function Game({
     setIsHosting(currentPlayer?.isAI || false);
   }, [currentPlayer?.isAI]);
   
-  // 回合倒计时（动态计算）
-  const [turnCountdown, setTurnCountdown] = useState<number>(gameState.turnTimer);
-  
   // 更新回合倒计时
   useEffect(() => {
     const updateTurnCountdown = () => {
