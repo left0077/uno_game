@@ -182,7 +182,7 @@ export function useSocket(
     });
 
     // 接收消息（表情/文字）
-    socket.on('message:received', (data) => {
+    socket.on('chat:receive', (data) => {
       if (callbacksRef.current.onReceiveMessage) {
         callbacksRef.current.onReceiveMessage(data);
       }

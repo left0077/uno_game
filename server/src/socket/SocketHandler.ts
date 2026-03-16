@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { RoomManager, roomManager } from '../rooms/RoomManager.js';
 import { UnoGame } from '../game/UnoGame.js';
+import { AIPlayer } from '../game/ai/index.js';
 import { SocketEvents, Player, Room, RoomSettings, UserSession } from '../shared/index.js';
 import { ACTION_API_VERSION } from '../shared/actionApi.js';
 
@@ -86,6 +87,8 @@ export function setupSocketHandlers(io: Server): void {
             socket.to(updatedRoom.code).emit(SocketEvents.PLAYER_LEFT, { playerId: userId });
             io.to(updatedRoom.code).emit(SocketEvents.ROOM_UPDATED, updatedRoom);
             socketUserMap.delete(socket.id);
+            // 清理AI策略缓存
+            AIPlayer.clearStrategyCache(userId);
           }
         }
       }
