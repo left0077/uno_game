@@ -443,12 +443,30 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
       
-      // 切换托管状态
+      // 切换托管状态 - 同时更新 room 和 gameState 中的玩家
       player.isAI = data.enabled;
       player.aiType = data.enabled ? 'host' : undefined;
+      player.aiDifficulty = data.enabled ? 'normal' : undefined; // 托管模式使用normal难度
+      
+      // 重要：同时更新 gameState 中的玩家状态
+      if (room.gameState) {
+        const gameStatePlayer = room.gameState.players.find(p => p.id === userId);
+        if (gameStatePlayer) {
+          gameStatePlayer.isAI = data.enabled;
+          gameStatePlayer.aiType = data.enabled ? 'host' : undefined;
+          gameStatePlayer.aiDifficulty = data.enabled ? 'normal' : undefined;
+        }
+      }
+      
+      console.log(`[Hosting] 玩家 ${player.nickname} ${data.enabled ? '开启' : '关闭'}托管模式`);
       
       // 通知所有玩家状态更新
       io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
+      
+      // 如果游戏进行中，也发送游戏状态更新
+      if (room.gameState) {
+        io.to(data.roomCode).emit(SocketEvents.GAME_STATE, room.gameState);
+      }
       
       // 通知当前玩家
       socket.emit(SocketEvents.ERROR, { 
@@ -460,6 +478,7 @@ export function setupSocketHandlers(io: Server): void {
       if (data.enabled && room.gameState?.currentPlayerId === userId) {
         const game = activeGames.get(data.roomCode);
         if (game) {
+          console.log(`[Hosting] 当前是托管玩家回合，触发AI出牌`);
           setTimeout(() => {
             game.checkAndHandleAITurn();
           }, 500);

@@ -169,6 +169,7 @@ export class UnoGame {
     // 自动开启托管模式
     currentPlayer.isAI = true;
     currentPlayer.aiType = 'host';
+    currentPlayer.aiDifficulty = 'normal'; // 设置AI难度
     
     // 通知所有玩家该玩家已进入托管模式
     this.callbacks.onStateChange(this.gameState);
@@ -215,21 +216,36 @@ export class UnoGame {
       p => p.id === this.gameState.currentPlayerId
     );
     
+    console.log(`[checkAndHandleAITurn] 检查AI回合:`, {
+      currentPlayerId: this.gameState.currentPlayerId,
+      playerFound: !!currentPlayer,
+      isAI: currentPlayer?.isAI,
+      aiType: currentPlayer?.aiType,
+      eliminated: currentPlayer?.eliminated
+    });
+    
     if (!currentPlayer || !currentPlayer.isAI || currentPlayer.eliminated) {
+      console.log(`[checkAndHandleAITurn] 不满足AI出牌条件`);
       return;
     }
     
     // AI延迟后行动
     const delay = currentPlayer.aiType === 'host' ? 1500 : 1000;
+    console.log(`[checkAndHandleAITurn] ${currentPlayer.nickname} 将在 ${delay}ms 后AI出牌`);
     
     setTimeout(() => {
-      if (this.gameState.currentPlayerId !== currentPlayer.id) return;
+      if (this.gameState.currentPlayerId !== currentPlayer.id) {
+        console.log(`[checkAndHandleAITurn] 回合已切换，取消AI出牌`);
+        return;
+      }
       
       const action = AIPlayer.getAIAction(
         currentPlayer,
         this.gameState,
         this.gameState.players
       );
+      
+      console.log(`[checkAndHandleAITurn] AI决策:`, action?.type || '无动作');
       
       if (action) {
         this.handleAction(action, currentPlayer.id);
