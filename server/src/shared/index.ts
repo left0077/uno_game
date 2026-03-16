@@ -82,6 +82,8 @@ export interface GameState {
   gameStartTime?: number; // 游戏开始时间戳（Out模式需要）
   humanPlayerCount?: number; // 开局真人数量（Out模式需要）
   maxHandSize?: number; // 手牌上限（Out模式=20，标准模式=0表示无上限）
+  // 超时处理
+  justDrewByTimeout?: boolean; // 是否因超时而摸牌（禁止立即出牌）
 }
 
 // 游戏动作类型

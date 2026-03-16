@@ -29,7 +29,16 @@ export class BaseGameMode implements GameMode {
    * 初始化游戏状态
    */
   initialize(room: Room): GameState {
-    const deck = CardManager.createDeck();
+    // 根据玩家人数决定牌库数量：2-4人=1副，5-8人=2副，9-12人=3副
+    const playerCount = room.players.length;
+    const deckMultiplier = Math.ceil(playerCount / 4);
+    
+    let deck: Card[] = [];
+    for (let i = 0; i < deckMultiplier; i++) {
+      deck.push(...CardManager.createDeck());
+    }
+    deck = CardManager.shuffleDeck(deck);
+    
     const discardPile: Card[] = [];
     
     // 翻开首张牌
@@ -270,7 +279,15 @@ export class BaseGameMode implements GameMode {
       state.currentColor = card.color;
     }
     
+    // 先处理已有的pendingDraw（如果被叠加）
     this.handlePendingDraw(state, card, playerId);
+    
+    // 如果打出的是+2/+4且当前没有pendingDraw，设置新的pendingDraw
+    if ((card.type === 'draw2' || card.type === 'draw4') && !state.pendingDraw) {
+      state.pendingDraw = card.type === 'draw2' ? 2 : 4;
+      state.pendingDrawType = card.type as 'draw2' | 'draw4';
+    }
+    
     this.applyCardEffect(state, card, playerId);
     
     state.turnStartTime = Date.now();

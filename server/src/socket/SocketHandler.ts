@@ -59,12 +59,34 @@ export function setupSocketHandlers(io: Server): void {
     // 离开房间
     socket.on(SocketEvents.LEAVE_ROOM, () => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      const room = roomManager.leaveRoom(userId);
+      const room = roomManager.getPlayerRoom(userId);
+      
       if (room) {
-        socket.leave(room.code);
-        socket.to(room.code).emit(SocketEvents.PLAYER_LEFT, { playerId: userId });
-        io.to(room.code).emit(SocketEvents.ROOM_UPDATED, room);
-        socketUserMap.delete(socket.id);
+        // 游戏进行中：转为托管而不是移除
+        if (room.status === 'playing') {
+          const player = room.players.find(p => p.id === userId);
+          if (player) {
+            player.isConnected = false;
+            player.disconnectedAt = Date.now();
+            player.isAI = true;
+            player.aiType = 'host';
+            player.aiDifficulty = 'normal';
+            
+            io.to(room.code).emit(SocketEvents.ROOM_UPDATED, room);
+            console.log(`Player ${userId} left room ${room.code} (playing status), converted to AI host`);
+          }
+          socket.leave(room.code);
+          socketUserMap.delete(socket.id);
+        } else {
+          // 等待状态：直接移除
+          const updatedRoom = roomManager.leaveRoom(userId);
+          if (updatedRoom) {
+            socket.leave(updatedRoom.code);
+            socket.to(updatedRoom.code).emit(SocketEvents.PLAYER_LEFT, { playerId: userId });
+            io.to(updatedRoom.code).emit(SocketEvents.ROOM_UPDATED, updatedRoom);
+            socketUserMap.delete(socket.id);
+          }
+        }
       }
     });
     
@@ -122,6 +144,11 @@ export function setupSocketHandlers(io: Server): void {
       // 更新玩家状态（id 保持不变，只更新连接状态）
       player.isConnected = true;
       player.disconnectedAt = undefined;
+      
+      // 清除托管状态（恢复为真人玩家）
+      player.isAI = false;
+      player.aiType = undefined;
+      player.aiDifficulty = undefined;
       
       // 加入房间
       socket.join(data.roomCode);

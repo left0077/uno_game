@@ -415,6 +415,8 @@ export class OutMode extends BaseGameMode {
   private checkHandLimit(state: GameState): GameState {
     for (const player of state.players) {
       if (!player.eliminated && player.cards.length > this.MAX_HAND_SIZE) {
+        const cardCount = player.cards.length; // 先保存手牌数
+        
         player.eliminated = true;
         
         if (!state.rankings) state.rankings = [];
@@ -424,7 +426,7 @@ export class OutMode extends BaseGameMode {
         player.cards = [];
         player.cardCount = 0;
         
-        console.log(`[OutMode] ${player.nickname} 被淘汰（手牌${player.cards.length}张）`);
+        console.log(`[OutMode] ${player.nickname} 被淘汰（手牌${cardCount}张 > 上限${this.MAX_HAND_SIZE}张）`);
       }
     }
     
@@ -594,6 +596,16 @@ export class OutMode extends BaseGameMode {
     
     // 游戏继续
     return null;
+  }
+  
+  /**
+   * 重写摸牌方法 - 摸牌后检查手牌上限
+   */
+  protected drawCardsForPlayer(state: GameState, playerId: string, count: number): void {
+    super.drawCardsForPlayer(state, playerId, count);
+    
+    // 摸牌后检查手牌上限
+    this.checkHandLimit(state);
   }
   
   destroy(): void {

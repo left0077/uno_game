@@ -159,22 +159,43 @@ export class UnoGame {
       return;
     }
     
-    // 如果已经是AI托管状态，不需要重复处理
+    // 如果已经是AI托管状态，由AI正常出牌
     if (currentPlayer.isAI) {
+      this.checkAndHandleAITurn();
       return;
     }
     
-    console.log(`[UnoGame] 玩家 ${currentPlayer.nickname} 回合超时，自动进入托管模式`);
+    console.log(`[UnoGame] 玩家 ${currentPlayer.nickname} 回合超时，自动摸牌`);
     
-    // 自动开启托管模式
-    currentPlayer.isAI = true;
-    currentPlayer.aiType = 'host';
-    currentPlayer.aiDifficulty = 'normal'; // 设置AI难度
+    // 超时自动摸牌（不是转托管）
+    const drawCount = this.gameState.pendingDraw && this.gameState.pendingDraw > 0 
+      ? this.gameState.pendingDraw 
+      : 1;
     
-    // 通知所有玩家该玩家已进入托管模式
+    // 标记为超时摸牌（禁止立即出牌）
+    this.gameState.justDrewByTimeout = true;
+    
+    // 执行摸牌
+    this.drawCards(currentPlayer.id, drawCount);
+    
+    // 清除pendingDraw
+    this.gameState.pendingDraw = 0;
+    this.gameState.pendingDrawType = undefined;
+    
+    // 清除超时摸牌标记（下一玩家回合开始前）
+    this.gameState.justDrewByTimeout = false;
+    
+    // 切换到下一玩家
+    this.gameState.currentPlayerId = this.getNextPlayerId(currentPlayer.id);
+    this.gameState.turnStartTime = Date.now();
+    
+    // 通知状态更新
     this.callbacks.onStateChange(this.gameState);
     
-    // 触发AI出牌
+    // 重置计时器
+    this.resetTurnTimer();
+    
+    // 检查是否是AI回合
     setTimeout(() => {
       this.checkAndHandleAITurn();
     }, 500);
@@ -251,6 +272,25 @@ export class UnoGame {
         this.handleAction(action, currentPlayer.id);
       }
     }, delay);
+  }
+  
+  /**
+   * 获取下一位玩家ID
+   */
+  private getNextPlayerId(currentId: string): string {
+    const state = this.gameState;
+    const currentIndex = state.players.findIndex(p => p.id === currentId);
+    const isClockwise = state.direction === 'clockwise';
+    const increment = isClockwise ? 1 : -1;
+    
+    let nextIndex = (currentIndex + increment + state.players.length) % state.players.length;
+    
+    // 跳过被淘汰的玩家
+    while (state.players[nextIndex].eliminated) {
+      nextIndex = (nextIndex + increment + state.players.length) % state.players.length;
+    }
+    
+    return state.players[nextIndex].id;
   }
   
   /**

@@ -319,7 +319,47 @@ export class RoomManager {
       this.playerRoomMap.set(playerId, roomCode);
     }
   }
+  
+  // 检查断线玩家并自动转为托管（每30秒调用一次）
+  checkDisconnectedPlayers(): string[] {
+    const now = Date.now();
+    const updatedRooms: string[] = [];
+    
+    this.rooms.forEach((room, code) => {
+      // 只处理进行中的游戏
+      if (room.status !== 'playing') return;
+      
+      let updated = false;
+      
+      room.players.forEach(player => {
+        // 非AI、已断线、有断线时间、且断线超过2分钟
+        if (!player.isAI && 
+            !player.isConnected && 
+            player.disconnectedAt &&
+            now - player.disconnectedAt > 2 * 60 * 1000) {
+          
+          console.log(`[RoomManager] 玩家 ${player.nickname} 断线超过2分钟，自动转为托管`);
+          
+          player.isAI = true;
+          player.aiType = 'host';
+          player.aiDifficulty = 'normal';
+          updated = true;
+        }
+      });
+      
+      if (updated) {
+        updatedRooms.push(code);
+      }
+    });
+    
+    return updatedRooms;
+  }
 }
 
 // 单例实例
 export const roomManager = new RoomManager();
+
+// 启动定时检查（每30秒检查一次断线玩家）
+setInterval(() => {
+  roomManager.checkDisconnectedPlayers();
+}, 30000);
