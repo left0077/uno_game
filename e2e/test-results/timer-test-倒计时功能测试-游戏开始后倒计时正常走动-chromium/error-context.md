@@ -1,0 +1,105 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - heading "房间 2023" [level=1] [ref=e7]
+      - paragraph [ref=e8]: 等待玩家加入...
+    - generic [ref=e9]:
+      - button "复制邀请链接" [ref=e10] [cursor=pointer]:
+        - img [ref=e11]
+        - text: 复制邀请链接
+      - button "复制房间号" [ref=e14] [cursor=pointer]:
+        - img [ref=e15]
+        - text: 复制房间号
+      - button "离开" [ref=e18] [cursor=pointer]:
+        - img [ref=e19]
+        - text: 离开
+  - generic [ref=e22]:
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - heading "玩家列表 (1/8)" [level=2] [ref=e26]:
+            - img [ref=e27]
+            - text: 玩家列表
+            - generic [ref=e32]: (1/8)
+          - button "添加AI" [ref=e33] [cursor=pointer]:
+            - img [ref=e34]
+            - text: 添加AI
+        - generic [ref=e37]:
+          - generic [ref=e38]:
+            - generic [ref=e39]: 测
+            - generic [ref=e40]:
+              - generic [ref=e41]:
+                - generic [ref=e42]: 测试玩家
+                - img [ref=e43]
+                - generic [ref=e45]: (你)
+              - generic [ref=e46]: 玩家
+          - generic [ref=e47]:
+            - img [ref=e49]
+            - generic [ref=e54]: 等待玩家加入...
+          - generic [ref=e55]:
+            - img [ref=e57]
+            - generic [ref=e62]: 等待玩家加入...
+          - generic [ref=e63]:
+            - img [ref=e65]
+            - generic [ref=e70]: 等待玩家加入...
+          - generic [ref=e71]:
+            - img [ref=e73]
+            - generic [ref=e78]: 等待玩家加入...
+          - generic [ref=e79]:
+            - img [ref=e81]
+            - generic [ref=e86]: 等待玩家加入...
+          - generic [ref=e87]:
+            - img [ref=e89]
+            - generic [ref=e94]: 等待玩家加入...
+          - generic [ref=e95]:
+            - img [ref=e97]
+            - generic [ref=e102]: 等待玩家加入...
+      - button "至少需要2人才能开始" [disabled] [ref=e103]:
+        - img [ref=e104]
+        - text: 至少需要2人才能开始
+    - generic [ref=e106]:
+      - generic [ref=e107]:
+        - heading "房间设置" [level=3] [ref=e109]:
+          - img [ref=e110]
+          - text: 房间设置
+        - generic [ref=e113]:
+          - generic [ref=e114] [cursor=pointer]:
+            - generic [ref=e115]:
+              - text: 叠加规则
+              - paragraph [ref=e116]: +2/+4 可叠加
+            - button "叠加规则 +2/+4 可叠加" [ref=e117]
+          - generic [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]:
+              - text: 多牌同出
+              - paragraph [ref=e121]: 相同数字可一起出
+            - button "多牌同出 相同数字可一起出" [ref=e122]
+          - generic [ref=e124] [cursor=pointer]:
+            - generic [ref=e125]:
+              - text: 抢打出牌
+              - paragraph [ref=e126]: 相同牌可抢出
+            - button "抢打出牌 相同牌可抢出" [ref=e127]
+          - generic [ref=e129] [cursor=pointer]:
+            - generic [ref=e130]:
+              - text: 计分模式
+              - paragraph [ref=e131]: 按手牌分数结算
+            - button "计分模式 按手牌分数结算" [ref=e132]
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - text: 游戏模式
+              - paragraph [ref=e136]: 标准模式：经典UNO规则
+            - generic [ref=e137]:
+              - button "标准" [ref=e138] [cursor=pointer]
+              - button "🔥 Out" [ref=e139] [cursor=pointer]
+      - generic [ref=e140]:
+        - heading "提示" [level=3] [ref=e141]:
+          - img [ref=e142]
+          - text: 提示
+        - list [ref=e144]:
+          - listitem [ref=e145]: • 房主可以踢出玩家
+          - listitem [ref=e146]: • 可以添加AI填充空位
+          - listitem [ref=e147]: • 至少需要2人开始游戏
+          - listitem [ref=e148]: • 游戏开始后不能添加AI
+```
