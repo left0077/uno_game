@@ -47,6 +47,9 @@ export function Game({
   // Out倒计时
   const [outCountdown, setRingCountdown] = useState<number>(0);
   
+  // 回合倒计时（动态计算）
+  const [turnCountdown, setTurnCountdown] = useState<number>(gameState.turnTimer);
+  
   // 连打相关状态
   const [selectedComboCards, setSelectedComboCards] = useState<string[]>([]);
   const [showTargetSelector, setShowTargetSelector] = useState(false);
@@ -57,6 +60,27 @@ export function Game({
   
   // 托管状态
   const [isHosting, setIsHosting] = useState(currentPlayer?.isAI || false);
+  
+  // 同步托管状态（当gameState更新时）
+  useEffect(() => {
+    setIsHosting(currentPlayer?.isAI || false);
+  }, [currentPlayer?.isAI]);
+  
+  // 回合倒计时（动态计算）
+  const [turnCountdown, setTurnCountdown] = useState<number>(gameState.turnTimer);
+  
+  // 更新回合倒计时
+  useEffect(() => {
+    const updateTurnCountdown = () => {
+      const elapsed = Math.floor((Date.now() - gameState.turnStartTime) / 1000);
+      const remaining = Math.max(0, gameState.turnTimer - elapsed);
+      setTurnCountdown(remaining);
+    };
+    
+    updateTurnCountdown();
+    const timer = setInterval(updateTurnCountdown, 1000);
+    return () => clearInterval(timer);
+  }, [gameState.turnStartTime, gameState.turnTimer]);
   
   // 更新Out倒计时
   useEffect(() => {
@@ -367,14 +391,14 @@ export function Game({
         <div className="flex items-center gap-4">
           {/* 倒计时 */}
           <div className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono font-bold ${
-            gameState.turnTimer <= 10 
+            turnCountdown <= 10 
               ? 'bg-red-500/20 text-red-400 animate-pulse' 
-              : gameState.turnTimer <= 30 
+              : turnCountdown <= 30 
               ? 'bg-yellow-500/20 text-yellow-400'
               : 'bg-slate-800 text-slate-300'
           }`}>
             <Clock className="w-4 h-4" />
-            {formatTime(gameState.turnTimer)}
+            {formatTime(turnCountdown)}
           </div>
           
           {/* Out倒计时 */}
