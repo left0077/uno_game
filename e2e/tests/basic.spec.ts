@@ -5,9 +5,6 @@ import { test, expect } from '@playwright/test';
  * 测试首页、房间创建、加入、AI管理等基础功能
  */
 
-// 增加超时时间（GitHub Pages 加载较慢）
-test.setTimeout(60000);
-
 test.describe('基础功能测试', () => {
   
   test('首页加载正常', async ({ page }) => {
@@ -49,6 +46,12 @@ test.describe('基础功能测试', () => {
   test('创建房间流程', async ({ page }) => {
     await page.goto('/', { timeout: 30000 });
     await page.waitForLoadState('networkidle');
+    
+    // 等待连接完成（按钮变为可用）
+    await page.waitForFunction(() => {
+      const btn = document.querySelector('button');
+      return btn && !btn.disabled;
+    }, { timeout: 10000 });
     
     // 输入昵称
     await page.getByPlaceholder(/昵称/i).first().fill('房主');
@@ -165,6 +168,12 @@ test.describe('多人交互测试', () => {
   test('房主可以添加AI', async ({ page }) => {
     await page.goto('/', { timeout: 30000 });
     await page.waitForLoadState('networkidle');
+    
+    // 等待连接完成
+    await page.waitForFunction(() => {
+      const btn = document.querySelector('button');
+      return btn && !btn.disabled;
+    }, { timeout: 10000 });
     
     // 输入昵称并创建房间
     await page.getByPlaceholder(/昵称/i).first().fill('房主');

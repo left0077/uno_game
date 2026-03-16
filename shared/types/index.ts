@@ -74,7 +74,7 @@ export interface GameState {
   rankings?: string[]; // 出完牌的玩家排名（按先后顺序）
   isRoundEnded?: boolean; // 本轮是否已结束
   skippedPlayerId?: string; // 被跳过的玩家ID（用于UI提示）
-  ringState?: RingState; // 缩圈状态
+  outState?: OutState; // Out模式状态
   gameStartTime?: number; // 游戏开始时间戳（缩圈模式需要）
   humanPlayerCount?: number; // 开局真人数量（缩圈模式需要）
 }
