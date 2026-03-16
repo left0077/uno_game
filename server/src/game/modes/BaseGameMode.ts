@@ -2,6 +2,20 @@ import { Room, GameState, GameAction, Player, Card } from '../../shared/index.js
 import { GameMode } from './GameMode.js';
 import { CardManager } from '../Card.js';
 import { v4 as uuidv4 } from 'uuid';
+import { 
+  AvailableActions, 
+  ValidationResult, 
+  PlayableCard, 
+  PenaltyOption, 
+  GameStateInfo,
+  PlayerActions,
+  createEmptyActions,
+  createValidationError,
+  createValidationSuccess,
+  createStateChange,
+  ACTION_API_VERSION,
+  ActionErrorCodes
+} from '../../shared/actionApi.js';
 
 /**
  * 基础游戏模式
@@ -483,6 +497,10 @@ export class BaseGameMode implements GameMode {
     return false;
   }
   
+  /**
+   * 获取玩家当前可执行的动作列表 (v1.0 - 已弃用)
+   * @deprecated 请使用 getAvailableActionsV2
+   */
   getAvailableActions(state: GameState, playerId: string): GameAction[] {
     let actions: GameAction[] = [];
     const player = state.players.find(p => p.id === playerId);
@@ -522,6 +540,413 @@ export class BaseGameMode implements GameMode {
     }
     
     return actions;
+  }
+
+  /**
+   * 获取玩家可用的所有动作 (v2.0)
+   * 这是新架构的核心接口，返回详细的动作信息
+   * 
+   * @param state - 当前游戏状态
+   * @param playerId - 玩家ID
+   * @returns AvailableActions - 详细的可用动作信息
+   */
+  getAvailableActionsV2(state: GameState, playerId: string): AvailableActions {
+    const startTime = Date.now();
+    const gameId = `game-${state.gameStartTime || startTime}`;
+    
+    console.log(`[ActionAPI] 开始计算可用动作: playerId=${playerId}`);
+    
+    const actions = createEmptyActions(playerId, gameId);
+    const player = state.players.find(p => p.id === playerId);
+    
+    // 检查玩家是否存在且未被淘汰
+    if (!player) {
+      console.log(`[ActionAPI] 玩家不存在: playerId=${playerId}`);
+      actions.state.type = 'eliminated';
+      actions.state.message = '玩家不存在';
+      return this.finalizeActions(actions, startTime, ['player_not_found']);
+    }
+    
+    if (player.eliminated) {
+      console.log(`[ActionAPI] 玩家已被淘汰: playerId=${playerId}`);
+      actions.state.type = 'eliminated';
+      actions.state.message = '你已被淘汰';
+      return this.finalizeActions(actions, startTime, ['player_eliminated']);
+    }
+    
+    // 检查是否是当前玩家回合
+    const isCurrentPlayer = state.currentPlayerId === playerId;
+    const topCard = state.discardPile[state.discardPile.length - 1];
+    
+    // 设置倒计时信息
+    if (state.turnTimer > 0 && state.turnStartTime > 0) {
+      const elapsed = Math.floor((Date.now() - state.turnStartTime) / 1000);
+      const remaining = Math.max(0, state.turnTimer - elapsed);
+      actions.state.countdown = {
+        total: state.turnTimer,
+        remaining,
+        warning: remaining <= 10
+      };
+    }
+    
+    // 场景1: 有待处理的惩罚（被+2/+4等）
+    if (state.pendingDraw && state.pendingDraw > 0) {
+      console.log(`[ActionAPI] 处理惩罚场景: pendingDraw=${state.pendingDraw}, type=${state.pendingDrawType}`);
+      return this.handlePendingDrawScenario(state, player, actions, startTime);
+    }
+    
+    // 场景2: 正常回合
+    if (isCurrentPlayer) {
+      console.log(`[ActionAPI] 处理正常回合场景`);
+      return this.handleNormalTurnScenario(state, player, actions, startTime);
+    }
+    
+    // 场景3: 非当前玩家（只可能有抢牌）
+    if (this.config.allowJumpIn) {
+      const jumpInCards = this.getJumpInCards(player.cards, topCard);
+      if (jumpInCards.length > 0) {
+        actions.actions.special.jumpIn = {
+          enabled: true,
+          reason: `可以抢牌: ${jumpInCards.length}张牌匹配`
+        };
+      }
+    }
+    
+    actions.state.type = 'normal';
+    actions.state.message = '等待你的回合...';
+    
+    console.log(`[ActionAPI] 非当前玩家回合，仅返回抢牌选项`);
+    return this.finalizeActions(actions, startTime, ['not_your_turn']);
+  }
+
+  /**
+   * 处理有待摸惩罚的场景
+   */
+  protected handlePendingDrawScenario(
+    state: GameState, 
+    player: Player, 
+    actions: AvailableActions,
+    startTime: number
+  ): AvailableActions {
+    const pendingDraw = state.pendingDraw || 0;
+    const pendingType = state.pendingDrawType;
+    const topCard = state.discardPile[state.discardPile.length - 1];
+    
+    // 设置状态信息
+    actions.state.type = 'pending_draw';
+    actions.state.message = `累积 +${pendingDraw}`;
+    actions.state.subMessage = '选择一种方式响应惩罚';
+    actions.state.pendingDraw = {
+      count: pendingDraw,
+      type: pendingType || 'draw2',
+      canStack: this.config.allowStacking,
+      canCombo: false, // 基础模式不支持连打响应
+      canReverse: false, // 基础模式不支持反转
+      canRainbow: false // 基础模式不支持彩虹
+    };
+    
+    const rulesChecked: string[] = ['pending_draw_scenario'];
+    
+    // 1. 可以跟+（相同类型的牌）
+    if (this.config.allowStacking) {
+      const stackableCards = player.cards.filter(c => c.type === pendingType);
+      if (stackableCards.length > 0) {
+        console.log(`[ActionAPI] 找到可跟+的牌: ${stackableCards.length}张`);
+        for (const card of stackableCards) {
+          const playableCard: PlayableCard = {
+            cardId: card.id,
+            card,
+            reasons: [{
+              type: 'stack',
+              description: `可以跟+${this.getDrawCount(card.type)}`,
+              priority: 100
+            }],
+            effects: [{
+              type: 'stack',
+              description: `累积惩罚+${this.getDrawCount(card.type)}`,
+              value: this.getDrawCount(card.type)
+            }],
+            uiHints: {
+              highlight: 'green',
+              animation: 'pulse',
+              tooltip: '跟+来累积惩罚'
+            }
+          };
+          actions.actions.play.cards.push(playableCard);
+        }
+        actions.actions.play.enabled = true;
+        rulesChecked.push(`stackable_cards_${stackableCards.length}`);
+      }
+    }
+    
+    // 2. 接受惩罚（摸牌）
+    actions.actions.draw = {
+      enabled: true,
+      count: pendingDraw,
+      reason: 'penalty',
+      autoDraw: false
+    };
+    
+    // 3. 惩罚响应选项
+    const penaltyOptions: PenaltyOption[] = [];
+    
+    // 接受惩罚选项
+    penaltyOptions.push({
+      type: 'accept',
+      priority: 0,
+      name: '接受惩罚',
+      description: `摸${pendingDraw}张牌`,
+      detailedEffect: `接受累积的惩罚，摸${pendingDraw}张牌`,
+      outcome: {
+        type: 'accept',
+        value: pendingDraw,
+        description: `摸${pendingDraw}张牌，回合结束`
+      },
+      ui: {
+        icon: '📥',
+        color: '#ff6b6b'
+      }
+    });
+    
+    actions.actions.penaltyResponse = {
+      enabled: penaltyOptions.length > 1, // 基础模式只有接受惩罚
+      options: penaltyOptions
+    };
+    
+    console.log(`[ActionAPI] 惩罚场景处理完成: ${actions.actions.play.cards.length}张可跟+, ${penaltyOptions.length}个响应选项`);
+    return this.finalizeActions(actions, startTime, rulesChecked);
+  }
+
+  /**
+   * 处理正常回合场景
+   */
+  protected handleNormalTurnScenario(
+    state: GameState,
+    player: Player,
+    actions: AvailableActions,
+    startTime: number
+  ): AvailableActions {
+    const topCard = state.discardPile[state.discardPile.length - 1];
+    const rulesChecked: string[] = ['normal_turn_scenario'];
+    
+    actions.state.type = 'normal';
+    actions.state.message = '你的回合';
+    
+    // 1. 检测可出的牌
+    const playableCards: PlayableCard[] = [];
+    for (const card of player.cards) {
+      const reasons = this.getPlayReasons(card, state, topCard);
+      if (reasons.length > 0) {
+        const effects = this.getCardEffects(card);
+        const requiresInput = this.getRequiredInput(card);
+        
+        playableCards.push({
+          cardId: card.id,
+          card,
+          reasons,
+          effects,
+          requiresInput,
+          uiHints: {
+            highlight: 'green',
+            tooltip: reasons.map(r => r.description).join(', ')
+          }
+        });
+      }
+    }
+    
+    actions.actions.play = {
+      enabled: playableCards.length > 0,
+      cards: playableCards
+    };
+    
+    console.log(`[ActionAPI] 可出牌数量: ${playableCards.length}`);
+    rulesChecked.push(`playable_cards_${playableCards.length}`);
+    
+    // 2. 检测是否可以摸牌
+    const canDraw = true; // 总是可以摸牌
+    const drawReason = playableCards.length === 0 ? 'no_options' : 'optional';
+    actions.actions.draw = {
+      enabled: canDraw,
+      count: 1,
+      reason: drawReason,
+      autoDraw: false
+    };
+    rulesChecked.push(`can_draw_${drawReason}`);
+    
+    // 3. 检测喊UNO
+    if (player.cards.length <= 2) {
+      actions.actions.special.callUno = {
+        enabled: !player.hasCalledUno,
+        reason: player.hasCalledUno ? '已喊过UNO' : '只剩' + player.cards.length + '张牌，可以喊UNO'
+      };
+      rulesChecked.push('can_call_uno');
+    }
+    
+    // 4. 检测抢牌
+    if (this.config.allowJumpIn) {
+      const jumpInCards = this.getJumpInCards(player.cards, topCard);
+      actions.actions.special.jumpIn = {
+        enabled: jumpInCards.length > 0,
+        reason: jumpInCards.length > 0 ? `可以抢牌: ${jumpInCards.length}张` : '没有可抢的牌'
+      };
+      if (jumpInCards.length > 0) {
+        rulesChecked.push(`can_jump_in_${jumpInCards.length}`);
+      }
+    }
+    
+    console.log(`[ActionAPI] 正常回合处理完成: ${playableCards.length}张可出牌`);
+    return this.finalizeActions(actions, startTime, rulesChecked);
+  }
+
+  /**
+   * 获取出牌原因
+   */
+  protected getPlayReasons(
+    card: Card, 
+    state: GameState, 
+    topCard: Card
+  ): PlayableCard['reasons'] {
+    const reasons: PlayableCard['reasons'] = [];
+    
+    if (card.type === 'wild' || card.type === 'draw4') {
+      reasons.push({
+        type: card.type === 'wild' ? 'wild' : 'draw4',
+        description: card.type === 'wild' ? '万能牌可以出' : '+4万能牌可以出',
+        priority: 90
+      });
+    } else if (card.color === state.currentColor) {
+      reasons.push({
+        type: 'color_match',
+        description: `颜色匹配: ${card.color}`,
+        priority: 100
+      });
+    } else if (card.value !== undefined && card.value === topCard.value) {
+      reasons.push({
+        type: 'value_match',
+        description: `数字匹配: ${card.value}`,
+        priority: 80
+      });
+    }
+    
+    return reasons;
+  }
+
+  /**
+   * 获取卡牌效果
+   */
+  protected getCardEffects(card: Card): PlayableCard['effects'] {
+    const effects: PlayableCard['effects'] = [];
+    
+    switch (card.type) {
+      case 'skip':
+        effects.push({ type: 'skip', description: '跳过下家', target: 'next' });
+        break;
+      case 'reverse':
+        effects.push({ type: 'reverse', description: '反转方向', target: 'all' });
+        break;
+      case 'draw2':
+        effects.push({ type: 'draw', description: '下家摸2张', target: 'next', value: 2 });
+        break;
+      case 'draw4':
+        effects.push({ type: 'draw', description: '下家摸4张', target: 'next', value: 4 });
+        effects.push({ type: 'change_color', description: '改变颜色' });
+        break;
+      case 'wild':
+        effects.push({ type: 'change_color', description: '改变颜色' });
+        break;
+    }
+    
+    return effects;
+  }
+
+  /**
+   * 获取需要额外输入的项
+   */
+  protected getRequiredInput(card: Card): PlayableCard['requiresInput'] {
+    if (card.type === 'wild' || card.type === 'draw4') {
+      return { color: true };
+    }
+    return undefined;
+  }
+
+  /**
+   * 获取可抢牌的卡牌
+   */
+  protected getJumpInCards(cards: Card[], topCard: Card): Card[] {
+    return cards.filter(c => 
+      c.color === topCard.color && c.value === topCard.value
+    );
+  }
+
+  /**
+   * 最终化动作数据
+   */
+  protected finalizeActions(
+    actions: AvailableActions,
+    startTime: number,
+    rulesChecked: string[]
+  ): AvailableActions {
+    const calculationTime = Date.now() - startTime;
+    
+    actions.metadata.debug = {
+      calculationTime,
+      rulesChecked,
+      source: 'BaseGameMode'
+    };
+    
+    console.log(`[ActionAPI] 计算完成: 耗时=${calculationTime}ms, 规则检查=${rulesChecked.join(',')}`);
+    
+    return actions;
+  }
+
+  /**
+   * 验证动作是否合法 (v2.0)
+   * 提供更详细的验证结果和错误信息
+   * 
+   * @param state - 当前游戏状态
+   * @param action - 要验证的动作
+   * @param playerId - 玩家ID
+   * @returns ValidationResult - 验证结果
+   */
+  validateActionV2(state: GameState, action: GameAction, playerId: string): ValidationResult {
+    const result = this.validateAction(state, action, playerId);
+    
+    if (!result.valid) {
+      // 根据错误消息映射到标准错误码
+      let errorCode: string = ActionErrorCodes.SERVER_ERROR;
+      
+      if (result.error?.includes('Not your turn')) {
+        errorCode = ActionErrorCodes.NOT_YOUR_TURN;
+      } else if (result.error?.includes('Player not found')) {
+        errorCode = ActionErrorCodes.PLAYER_ELIMINATED;
+      } else if (result.error?.includes('Card not found')) {
+        errorCode = ActionErrorCodes.CARD_NOT_IN_HAND;
+      } else if (result.error?.includes('Cannot play')) {
+        errorCode = ActionErrorCodes.CARD_NOT_PLAYABLE;
+      } else if (result.error?.includes('Unknown action')) {
+        errorCode = ActionErrorCodes.SERVER_ERROR;
+      }
+      
+      return createValidationError(errorCode, result.error || '未知错误');
+    }
+    
+    // 创建状态变更预览
+    const stateChanges: ReturnType<typeof createStateChange>[] = [];
+    const notifications: string[] = [];
+    
+    switch (action.type) {
+      case 'play':
+        stateChanges.push(createStateChange('card_move', '打出卡牌', 'in_hand', 'discard_pile'));
+        break;
+      case 'draw':
+        stateChanges.push(createStateChange('card_move', '摸牌', 'deck', 'in_hand'));
+        break;
+      case 'skip':
+        stateChanges.push(createStateChange('turn_change', '跳过回合', playerId, 'next_player'));
+        break;
+    }
+    
+    return createValidationSuccess(stateChanges, notifications);
   }
   
   checkWinCondition(state: GameState): string | null {

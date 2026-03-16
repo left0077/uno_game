@@ -40,6 +40,7 @@ export function useSocket(
   onGameStarted?: (gameState: GameState) => void,
   onGameState?: (gameState: GameState) => void,
   onGameEnded?: (data: { winner: Player }) => void,
+  onReceiveMessage?: (msg: { type: string; content: string; playerId: string; playerName: string; timestamp: number }) => void,
   onError?: (error: { code: string; message: string }) => void
 ): UseSocketReturn {
   const socketRef = useRef<Socket | null>(null);
@@ -62,6 +63,7 @@ export function useSocket(
     onGameStarted,
     onGameState,
     onGameEnded,
+    onReceiveMessage,
     onError
   });
   
@@ -76,9 +78,10 @@ export function useSocket(
       onGameStarted,
       onGameState,
       onGameEnded,
+      onReceiveMessage,
       onError
     };
-  }, [onRoomCreated, onRoomJoined, onRoomUpdated, onPlayerJoined, onPlayerLeft, onGameStarted, onGameState, onGameEnded, onError]);
+  }, [onRoomCreated, onRoomJoined, onRoomUpdated, onPlayerJoined, onPlayerLeft, onGameStarted, onGameState, onGameEnded, onReceiveMessage, onError]);
 
   // 初始化Socket连接
   useEffect(() => {
@@ -175,6 +178,13 @@ export function useSocket(
     socket.on('game:challengeResult', (data) => {
       if (callbacksRef.current.onError) {
         callbacksRef.current.onError({ code: data.success ? 'CHALLENGE_SUCCESS' : 'CHALLENGE_FAILED', message: data.message });
+      }
+    });
+
+    // 接收消息（表情/文字）
+    socket.on('message:received', (data) => {
+      if (callbacksRef.current.onReceiveMessage) {
+        callbacksRef.current.onReceiveMessage(data);
       }
     });
 

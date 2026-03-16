@@ -15,8 +15,12 @@ export { OutMode } from './modes/OutMode.js';
 // AI模块
 export {
   AIPlayer,
-  AIStrategy,
-  AIContext
+  AIContext,
+  BaseAIStrategy,
+  AICapability,
+  EasyAIStrategy,
+  NormalAIStrategy,
+  HardAIStrategy
 } from './ai/index.js';
 
 // 卡牌管理

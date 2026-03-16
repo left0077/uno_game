@@ -28,8 +28,18 @@ function findTestFiles(dir: string): string[] {
 async function runTests() {
   console.log('🚀 开始运行服务端测试\n');
   
-  const testDir = join(__dirname, 'unit');
-  const testFiles = findTestFiles(testDir);
+  // 搜索所有测试目录
+  const testDirs = ['unit', 'action-api', 'integration', 'performance'];
+  let testFiles: string[] = [];
+  
+  for (const dir of testDirs) {
+    const dirPath = join(__dirname, dir);
+    try {
+      testFiles.push(...findTestFiles(dirPath));
+    } catch (e) {
+      // 目录可能不存在，忽略
+    }
+  }
   
   if (testFiles.length === 0) {
     console.log('⚠️ 未找到测试文件');

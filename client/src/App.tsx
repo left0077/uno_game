@@ -107,6 +107,13 @@ function App() {
     console.error('Socket error:', error);
   }, [store]);
 
+  const handleReceiveMessage = useCallback((msg: { type: string; content: string; playerId: string; playerName: string; timestamp: number }) => {
+    // 添加消息到聊天列表
+    setChatMessages(prev => [...prev, msg]);
+    // 限制消息数量
+    setChatMessages(prev => prev.slice(-20));
+  }, []);
+
   const [isReconnecting, setIsReconnecting] = useState(false);
   
   const socket = useSocket(
@@ -121,6 +128,7 @@ function App() {
     handleGameStarted,
     handleGameState,
     handleGameEnded,
+    handleReceiveMessage,
     handleError
   );
   

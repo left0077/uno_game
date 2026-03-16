@@ -1,4 +1,5 @@
 import { Room, GameState, GameAction, Card, Player } from '../../shared/index.js';
+import { AvailableActions, ValidationResult, ComboType, ComboDefinition, ComboEffect } from '../../shared/actionApi.js';
 
 /**
  * 游戏模式接口
@@ -32,9 +33,22 @@ export interface GameMode {
   ): GameState;
   
   /**
-   * 获取玩家当前可执行的动作列表
+   * 获取玩家当前可执行的动作列表 (v1.0 - 已弃用)
+   * @deprecated 请使用 getAvailableActionsV2
    */
   getAvailableActions(state: GameState, playerId: string): GameAction[];
+  
+  /**
+   * 获取玩家可用的所有动作 (v2.0)
+   * 这是新架构的核心接口，返回详细的动作信息
+   */
+  getAvailableActionsV2(state: GameState, playerId: string): AvailableActions;
+  
+  /**
+   * 验证动作是否合法 (v2.0)
+   * 提供更详细的验证结果和错误信息
+   */
+  validateActionV2(state: GameState, action: GameAction, playerId: string): ValidationResult;
   
   /**
    * 检查胜利条件
@@ -52,32 +66,8 @@ export interface GameMode {
   destroy?(): void;
 }
 
-/**
- * 连打类型
- */
-export type ComboType = 'pair' | 'three' | 'rainbow' | 'straight';
-
-/**
- * 连打效果
- */
-export interface ComboEffect {
-  type: 'draw' | 'skip' | 'transfer' | 'none';
-  target: 'next' | 'prev' | 'self' | 'chooser';
-  value: number;
-  extra?: Record<string, unknown>;
-}
-
-/**
- * 连打定义
- */
-export interface ComboDefinition {
-  readonly type: ComboType;
-  readonly name: string;
-  readonly minCards: number;
-  readonly maxCards?: number;
-  validate(cards: Card[]): boolean;
-  getEffect(state: GameState, cards: Card[], playerId: string): ComboEffect;
-}
+// 从 actionApi.ts 重新导出类型
+export { ComboType, ComboDefinition, ComboEffect, AvailableActions, ValidationResult } from '../../shared/actionApi.js';
 
 /**
  * 游戏模式工厂

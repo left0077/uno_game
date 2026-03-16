@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { RoomManager, roomManager } from '../rooms/RoomManager.js';
 import { UnoGame } from '../game/UnoGame.js';
 import { SocketEvents, Player, Room, RoomSettings, UserSession } from '../shared/index.js';
+import { ACTION_API_VERSION } from '../shared/actionApi.js';
 
 // 存储 socket 到 userId 的映射
 const socketUserMap = new Map<string, string>();
@@ -248,7 +249,37 @@ export function setupSocketHandlers(io: Server): void {
       // 创建游戏实例
       const game = new UnoGame(room, {
         onStateChange: (state) => {
-          io.to(data.roomCode).emit(SocketEvents.GAME_STATE, state);
+          // 发送游戏状态，包含 actionApiVersion
+          io.to(data.roomCode).emit(SocketEvents.GAME_STATE, {
+            ...state,
+            actionApiVersion: ACTION_API_VERSION
+          });
+          
+          // 为当前回合玩家发送可用动作
+          const currentPlayerId = state.currentPlayerId;
+          if (currentPlayerId) {
+            try {
+              const availableActions = game.getAvailableActionsV2(currentPlayerId);
+              
+              // 找到当前回合玩家的socket并发送
+              const roomSockets = io.sockets.adapter.rooms.get(data.roomCode);
+              if (roomSockets) {
+                for (const socketId of roomSockets) {
+                  const socket = io.sockets.sockets.get(socketId);
+                  const socketUserId = socketUserMap.get(socketId);
+                  if (socket && socketUserId === currentPlayerId) {
+                    socket.emit('game:availableActions', { 
+                      playerId: currentPlayerId,
+                      availableActions 
+                    });
+                    break;
+                  }
+                }
+              }
+            } catch (error) {
+              console.error(`[SocketHandler] 发送可用动作失败: playerId=${currentPlayerId}`, error);
+            }
+          }
         },
         onGameEnd: (winner) => {
           // 游戏结束处理
@@ -291,8 +322,41 @@ export function setupSocketHandlers(io: Server): void {
       });
       
       activeGames.set(data.roomCode, game);
-      io.to(data.roomCode).emit(SocketEvents.GAME_START, { success: true, gameState: game.getGameState() });
-      console.log(`Game started in room: ${data.roomCode}`);
+      
+      // 发送游戏开始事件，包含 actionApiVersion
+      const gameState = game.getGameState();
+      io.to(data.roomCode).emit(SocketEvents.GAME_START, { 
+        success: true, 
+        gameState,
+        actionApiVersion: ACTION_API_VERSION
+      });
+      
+      // 为每个玩家发送其可用的动作
+      for (const player of room.players) {
+        if (!player.eliminated) {
+          try {
+            const availableActions = game.getAvailableActionsV2(player.id);
+            // 只发送给该玩家（通过socket id）
+            const playerSocket = Array.from(io.sockets.adapter.rooms.get(data.roomCode) || [])
+              .map(socketId => io.sockets.sockets.get(socketId))
+              .find(socket => {
+                const socketUserId = socketUserMap.get(socket?.id || '');
+                return socketUserId === player.id;
+              });
+            
+            if (playerSocket) {
+              playerSocket.emit('game:availableActions', { 
+                playerId: player.id,
+                availableActions 
+              });
+            }
+          } catch (error) {
+            console.error(`[SocketHandler] 发送可用动作失败: playerId=${player.id}`, error);
+          }
+        }
+      }
+      
+      console.log(`Game started in room: ${data.roomCode} with Action API v${ACTION_API_VERSION}`);
     });
     
     // 出牌

@@ -1,6 +1,7 @@
 import { Room, Player, GameState, GameAction, Card } from '../shared/index.js';
 import { GameMode, GameModeFactory } from './modes/GameMode.js';
 import { AIPlayer } from './ai/index.js';
+import { AvailableActions } from '../shared/actionApi.js';
 
 // 注册游戏模式
 import { BaseGameMode } from './modes/BaseGameMode.js';
@@ -62,6 +63,11 @@ export class UnoGame {
     room.status = 'playing';
     room.gameState = this.gameState;
     
+    // 设置AI表情回调
+    AIPlayer.onSendEmoji = (playerId, emoji, target) => {
+      this.callbacks.onSendMessage?.(playerId, 'emoji', emoji);
+    };
+    
     // 启动回合计时器
     this.startTurnTimer();
     
@@ -116,10 +122,22 @@ export class UnoGame {
   }
   
   /**
-   * 获取玩家可执行的动作列表
+   * 获取玩家可执行的动作列表 (v1.0 - 已弃用)
+   * @deprecated 请使用 getAvailableActionsV2
    */
   getAvailableActions(playerId: string): GameAction[] {
     return this.mode.getAvailableActions(this.gameState, playerId);
+  }
+
+  /**
+   * 获取玩家可用的所有动作 (v2.0)
+   * 返回详细的动作信息，支持前端精准渲染
+   * 
+   * @param playerId - 玩家ID
+   * @returns AvailableActions - 详细的可用动作信息
+   */
+  getAvailableActionsV2(playerId: string): AvailableActions {
+    return this.mode.getAvailableActionsV2(this.gameState, playerId);
   }
   
   /**
@@ -269,7 +287,25 @@ export class UnoGame {
       console.log(`[checkAndHandleAITurn] AI决策:`, action?.type || '无动作');
       
       if (action) {
-        this.handleAction(action, currentPlayer.id);
+        const success = this.handleAction(action, currentPlayer.id);
+        
+        // 如果动作执行失败（如连打第一张牌不匹配），尝试摸牌
+        if (!success) {
+          console.log(`[checkAndHandleAITurn] AI动作执行失败，尝试摸牌`);
+          this.handleAction({
+            type: 'draw',
+            playerId: currentPlayer.id,
+            timestamp: Date.now()
+          }, currentPlayer.id);
+        }
+      } else {
+        // 没有可执行的动作，摸牌
+        console.log(`[checkAndHandleAITurn] AI无可用动作，执行摸牌`);
+        this.handleAction({
+          type: 'draw',
+          playerId: currentPlayer.id,
+          timestamp: Date.now()
+        }, currentPlayer.id);
       }
     }, delay);
   }

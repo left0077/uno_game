@@ -33,6 +33,31 @@ export function expect(actual: any) {
         throw new Error(`期望为假值，实际 ${actual}`);
       }
     },
+    toBeNull: () => {
+      if (actual !== null) {
+        throw new Error(`期望为 null, 实际 ${actual}`);
+      }
+    },
+    toBeLessThan: (expected: number) => {
+      if (actual >= expected) {
+        throw new Error(`期望小于 ${expected}, 实际 ${actual}`);
+      }
+    },
+    toBeGreaterThan: (expected: number) => {
+      if (actual <= expected) {
+        throw new Error(`期望大于 ${expected}, 实际 ${actual}`);
+      }
+    },
+    toBeGreaterThanOrEqual: (expected: number) => {
+      if (actual < expected) {
+        throw new Error(`期望大于等于 ${expected}, 实际 ${actual}`);
+      }
+    },
+    toBeUndefined: () => {
+      if (actual !== undefined) {
+        throw new Error(`期望为 undefined, 实际 ${actual}`);
+      }
+    },
     toThrow: (fn: () => void) => {
       let threw = false;
       try {
