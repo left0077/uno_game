@@ -10,7 +10,9 @@ import {
   Copy,
   Check,
   Settings,
-  Link2
+  Link2,
+  BookOpen,
+  X
 } from 'lucide-react';
 import type { Room as RoomType, Player, RoomSettings } from '../../../shared/types';
 
@@ -52,6 +54,7 @@ export function Room({
   const [copied, setCopied] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [showAddAI, setShowAddAI] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   const isHost = room.hostId === currentPlayerId;
   const canStart = room.players.length >= 2 && isHost && room.status === 'waiting';
@@ -309,11 +312,22 @@ export function Room({
 
                 {/* 游戏模式 */}
                 <div className={`${isHost ? '' : 'opacity-70'}`}>
-                  <div className="mb-2">
-                    <span className="text-sm text-slate-400">游戏模式</span>
-                    <p className="text-xs text-slate-600">
-                      {room.settings.mode === 'out' ? '🔥 Out模式：超出上限即淘汰！' : '标准模式：经典UNO规则'}
-                    </p>
+                  <div className="mb-2 flex items-center justify-between">
+                    <div>
+                      <span className="text-sm text-slate-400">游戏模式</span>
+                      <p className="text-xs text-slate-600">
+                        {room.settings.mode === 'out' ? '🔥 Out模式：超出上限即淘汰！' : '标准模式：经典UNO规则'}
+                      </p>
+                    </div>
+                    {/* 规则书按钮 */}
+                    <button
+                      onClick={() => setShowRules(true)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
+                      title="查看游戏规则"
+                    >
+                      <BookOpen className="w-3 h-3" />
+                      规则
+                    </button>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -359,6 +373,107 @@ export function Room({
           </div>
         </div>
       </div>
+
+      {/* 规则书弹窗 */}
+      {showRules && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl border border-slate-700">
+            {/* 弹窗头部 */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 bg-slate-900/50">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-400" />
+                游戏规则
+              </h2>
+              <button
+                onClick={() => setShowRules(false)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* 规则内容 */}
+            <div className="p-6 overflow-y-auto max-h-[60vh] space-y-6">
+              {/* 标准模式规则 */}
+              <div>
+                <h3 className="text-lg font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded bg-blue-600 text-white text-xs flex items-center justify-center">标</span>
+                  标准模式
+                </h3>
+                <ul className="space-y-2 text-sm text-slate-300">
+                  <li className="flex gap-2">
+                    <span className="text-blue-500">•</span>
+                    <span><strong className="text-white">基础规则：</strong>打出与上家相同颜色或数字的牌，或使用功能牌</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-500">•</span>
+                    <span><strong className="text-white">功能牌：</strong>跳过、反转、+2、万能牌、+4万能牌</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-500">•</span>
+                    <span><strong className="text-white">喊 UNO：</strong>出到只剩1张牌时必须喊 UNO，否则被惩罚摸2张</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-500">•</span>
+                    <span><strong className="text-white">胜利条件：</strong>最先出完所有手牌的玩家获胜</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Out 模式规则 */}
+              <div>
+                <h3 className="text-lg font-semibold text-red-400 mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded bg-red-600 text-white text-xs flex items-center justify-center">Out</span>
+                  Out 模式（缩圈模式）
+                </h3>
+                <ul className="space-y-2 text-sm text-slate-300">
+                  <li className="flex gap-2">
+                    <span className="text-red-500">•</span>
+                    <span><strong className="text-white">三阶段缩圈：</strong>游戏开始15分钟→上限15张，18分钟→上限8张，21分钟→上限3张</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-red-500">•</span>
+                    <span><strong className="text-white">淘汰机制：</strong>手牌超过上限时立即被淘汰</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-red-500">•</span>
+                    <span><strong className="text-white">连打系统：</strong>可出对子(2张)、三条(3张)、彩虹(4色同数字)、顺子(3+连续数字)</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-red-500">•</span>
+                    <span><strong className="text-white">彩虹转移：</strong>彩虹牌可将累积的惩罚转移给指定玩家</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-red-500">•</span>
+                    <span><strong className="text-white">惩罚卡：</strong>Out阶段会往牌堆注入+3、+5、+8等惩罚卡</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* 通用设置说明 */}
+              <div className="bg-slate-700/30 rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-slate-200 mb-2">房间设置说明</h3>
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+                  <div><strong className="text-slate-300">叠加规则：</strong>+2/+4 可叠加</div>
+                  <div><strong className="text-slate-300">多牌同出：</strong>相同数字可一起出</div>
+                  <div><strong className="text-slate-300">抢打出牌：</strong>相同牌可抢出</div>
+                  <div><strong className="text-slate-300">计分模式：</strong>按手牌分数结算</div>
+                </div>
+              </div>
+            </div>
+            
+            {/* 弹窗底部 */}
+            <div className="px-6 py-4 border-t border-slate-700 bg-slate-900/50 flex justify-end">
+              <button
+                onClick={() => setShowRules(false)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+              >
+                知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

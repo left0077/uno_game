@@ -86,13 +86,12 @@ test.describe('基础功能测试', () => {
     // 等待页面加载
     await expect(page.locator('h1, .title').first()).toBeVisible();
     
-    // 点击加入房间按钮 - 使用第一个按钮
-    await page.getByRole('button', { name: /加入房间/i }).first().click();
+    // 验证页面显示邀请链接模式
+    const content = await page.content();
+    expect(content).toContain('1234');
+    expect(content).toContain('邀请链接');
     
-    // 等待弹窗或输入框出现
-    await page.waitForTimeout(500);
-    
-    // 检查是否有房间号输入框且值为1234
+    // 验证输入框已填充房间号
     const roomInput = page.getByPlaceholder(/\d{4}/).first();
     if (await roomInput.isVisible().catch(() => false)) {
       await expect(roomInput).toHaveValue('1234');
@@ -114,6 +113,11 @@ test.describe('多人交互测试', () => {
       // 玩家1创建房间
       await page1.goto('/', { timeout: 30000 });
       await page1.waitForLoadState('networkidle');
+      // 等待连接完成
+      await page1.waitForFunction(() => {
+        const btn = document.querySelector('button');
+        return btn && !btn.disabled;
+      }, { timeout: 10000 });
       await page1.getByPlaceholder(/昵称/i).first().fill('房主');
       await page1.getByRole('button', { name: /创建房间/i }).click();
       await page1.waitForTimeout(3000);
@@ -126,31 +130,18 @@ test.describe('多人交互测试', () => {
       
       console.log('房间号:', roomCode);
       
-      // 玩家2加入房间
-      await page2.goto('/', { timeout: 30000 });
+      // 玩家2加入房间 - 直接使用邀请链接
+      await page2.goto(`/?room=${roomCode}`, { timeout: 30000 });
       await page2.waitForLoadState('networkidle');
+      // 等待连接完成
+      await page2.waitForFunction(() => {
+        const btn = document.querySelector('button');
+        return btn && !btn.disabled;
+      }, { timeout: 10000 });
       await page2.getByPlaceholder(/昵称/i).first().fill('玩家2');
-      await page2.getByRole('button', { name: /加入房间/i }).click();
       
-      // 等待输入框并输入房间号
-      await page2.waitForTimeout(1000);
-      // 尝试找到房间号输入框
-      const inputs = await page2.locator('input').all();
-      let roomInput = null;
-      for (const input of inputs) {
-        const placeholder = await input.getAttribute('placeholder');
-        if (placeholder && (placeholder.includes('4') || placeholder.includes('房间'))) {
-          roomInput = input;
-          break;
-        }
-      }
-      if (roomInput) {
-        await roomInput.fill(roomCode);
-      }
-      
-      // 点击进入
-      const enterButton = page2.getByRole('button', { name: /进入|确认/i }).first();
-      await enterButton.click();
+      // 点击进入按钮
+      await page2.getByRole('button', { name: /进入/i }).first().click();
       
       // 验证加入成功
       await expect(page2.getByText('玩家2', { exact: true })).toBeVisible({ timeout: 15000 });
