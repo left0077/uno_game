@@ -264,11 +264,16 @@ export class HardAIStrategy extends BaseAIStrategy {
       candidates.push({ action, value });
     }
     
+    // 如果没有可选动作，返回null
+    if (candidates.length === 0) {
+      return null;
+    }
+    
     // 选择价值最高的动作
     const best = candidates.reduce((max, c) => c.value > max.value ? c : max, candidates[0]);
     
     // 欺骗策略：有时保留强力牌
-    if (this.shouldReservePowerCard(best.action, ctx)) {
+    if (best && this.shouldReservePowerCard(best.action, ctx)) {
       // 找次优的动作
       const alternative = candidates
         .filter(c => !this.isPowerCardAction(c.action))

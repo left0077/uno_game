@@ -1,17 +1,23 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import { Home } from './pages/Home';
 import { Room } from './pages/Room';
 import { Game } from './pages/Game';
+import GameV2 from './pages/GameV2';
 import { SettingsModal } from './components/SettingsModal';
-import { useSocket } from './hooks/useSocket';
+import { useSocket, AvailableActionsV2 } from './hooks/useSocket';
 import { useGameStore } from './hooks/useGameStore';
 import type { Room as RoomType, GameState, Player, RoomSettings, ChatMessage } from '../../shared/types';
 
-type Page = 'home' | 'room' | 'game';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+
+type Page = 'home' | 'room' | 'game' | 'gamev2';
 
 function App() {
   const store = useGameStore();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  // V2 API: 存储从 socket 接收的可用动作
+  const [availableActionsV2, setAvailableActionsV2] = useState<AvailableActionsV2 | null>(null);
   // 检查 URL 参数（优先处理分享链接）
   const urlParams = new URLSearchParams(window.location.search);
   const inviteRoomCode = urlParams.get('room');
@@ -25,8 +31,6 @@ function App() {
     }
     // 否则检查保存的状态
     const savedRoom = localStorage.getItem('uno-current-room');
-    const savedGameState = localStorage.getItem('uno-game-state');
-    if (savedGameState) return 'game';
     if (savedRoom) return 'room';
     return 'home';
   });
@@ -39,7 +43,6 @@ function App() {
       if (room.status === 'finished') {
         // 如果游戏已结束，清除保存的状态
         localStorage.removeItem('uno-current-room');
-        localStorage.removeItem('uno-game-state');
         setPage('home');
       }
     }
@@ -53,11 +56,25 @@ function App() {
   }, []);
   
   const handleRoomCreated = useCallback((room: RoomType) => {
+    console.log('[App] Room created:', room?.code);
+    if (!room) {
+      console.error('[App] Room is null/undefined');
+      return;
+    }
+    // 先保存 nickname
+    localStorage.setItem('uno-nickname', store.nickname);
+    // 设置 room（store.setCurrentRoom 内部会保存到 localStorage）
     store.setCurrentRoom(room);
+    // 强制跳转到 room 页面
     setPage('room');
-  }, [store]);
+  }, [store, store.nickname]);
 
   const handleRoomJoined = useCallback((room: RoomType) => {
+    console.log('[App] Room joined:', room?.code);
+    if (!room) {
+      console.error('[App] Room is null/undefined');
+      return;
+    }
     store.setCurrentRoom(room);
     setPage('room');
   }, [store]);
@@ -68,6 +85,12 @@ function App() {
 
   const handleGameStarted = useCallback((gameState: GameState) => {
     store.setGameState(gameState);
+    // 更新房间状态为 playing
+    if (store.currentRoom) {
+      const updatedRoom = { ...store.currentRoom, status: 'playing' as const };
+      store.setCurrentRoom(updatedRoom);
+      localStorage.setItem('uno-current-room', JSON.stringify(updatedRoom));
+    }
     setPage('game');
   }, [store]);
 
@@ -114,6 +137,11 @@ function App() {
     setChatMessages(prev => prev.slice(-20));
   }, []);
 
+  const handleAvailableActions = useCallback((actions: AvailableActionsV2) => {
+    // 保存 V2 API 可用动作
+    setAvailableActionsV2(actions);
+  }, []);
+
   const [isReconnecting, setIsReconnecting] = useState(false);
   
   const socket = useSocket(
@@ -129,7 +157,8 @@ function App() {
     handleGameState,
     handleGameEnded,
     handleReceiveMessage,
-    handleError
+    handleError,
+    handleAvailableActions
   );
   
   // 断线重连处理
@@ -138,7 +167,7 @@ function App() {
   useEffect(() => {
     // 如果 socket 连接成功，且之前有房间状态，尝试重连
     if (socket.isConnected && store.currentRoom && !isReconnecting && !hasReconnectedRef.current) {
-      if (page === 'room' || page === 'game') {
+      if (page === 'room' || page === 'game' || page === 'gamev2') {
         // 页面刷新后总是尝试重连（不管 localStorage 中的 isConnected 状态）
         setIsReconnecting(true);
         hasReconnectedRef.current = true;
@@ -163,9 +192,20 @@ function App() {
       }
     };
     
+    // 处理重连失败 - 静默处理，不显示错误（这是正常流程）
+    const handleReconnectFailed = () => {
+      setIsReconnecting(false);
+      // 清除保存的房间状态，让用户重新加入
+      store.setCurrentRoom(null);
+      store.setGameState(null);
+      setPage('home');
+    };
+    
     socket.socket?.on('player:reconnected', handleReconnected);
+    socket.socket?.on('player:reconnectFailed', handleReconnectFailed);
     return () => {
       socket.socket?.off('player:reconnected', handleReconnected);
+      socket.socket?.off('player:reconnectFailed', handleReconnectFailed);
     };
   }, [socket.socket, store]);
   
@@ -222,6 +262,22 @@ function App() {
     }
   }, [socket, store.currentRoom]);
 
+  const handleStartGameV2 = useCallback(() => {
+    if (store.currentRoom) {
+      // 使用 V2 Socket API 开始游戏
+      const socketV2 = io(SOCKET_URL, { transports: ['websocket'] });
+      socketV2.emit('auth', { userId: store.userId, nickname: store.nickname });
+      socketV2.emit('v2:gameStart', { 
+        roomCode: store.currentRoom.code, 
+        mode: 'out' 
+      });
+      
+      // 保存房间代码并切换到 V2 游戏页面
+      localStorage.setItem('uno-current-room', JSON.stringify(store.currentRoom));
+      setPage('gamev2');
+    }
+  }, [socket, store.currentRoom, store.userId, store.nickname]);
+
   const handleUpdateSettings = useCallback((settings: Partial<RoomSettings>) => {
     if (store.currentRoom) {
       socket.updateSettings(store.currentRoom.code, settings);
@@ -257,7 +313,7 @@ function App() {
   
   // 断线提示组件
   const ConnectionStatus = () => {
-    if (!socket.isConnected && (page === 'room' || page === 'game')) {
+    if (!socket.isConnected && (page === 'room' || page === 'game' || page === 'gamev2')) {
       return (
         <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500/90 text-yellow-900 px-4 py-2 text-center text-sm font-medium">
           {isReconnecting ? '正在重新连接...' : '连接已断开，正在尝试重连...'}
@@ -306,27 +362,39 @@ function App() {
         </>
       );
 
-    case 'room':
-      if (!store.currentRoom) {
+    case 'room': {
+      // 优先使用 store 中的房间，如果没有则从 localStorage 恢复
+      const savedRoom = localStorage.getItem('uno-current-room');
+      const room = store.currentRoom || (savedRoom ? JSON.parse(savedRoom) : null);
+      
+      if (!room) {
         setPage('home');
         return null;
       }
+      
+      // 同步更新 store（如果还没有设置）
+      if (!store.currentRoom && savedRoom) {
+        store.setCurrentRoom(JSON.parse(savedRoom));
+      }
+      
       return (
         <>
           <ConnectionStatus />
           <Room
-          room={store.currentRoom}
+          room={room}
           currentPlayerId={currentPlayerId}
           onLeaveRoom={handleLeaveRoom}
           onAddAI={handleAddAI}
           onRemoveAI={handleRemoveAI}
           onKickPlayer={handleKickPlayer}
           onStartGame={handleStartGame}
+          onStartGameV2={handleStartGameV2}
           onUpdateSettings={handleUpdateSettings}
           error={store.error}
         />
         </>
       );
+    }
 
     case 'game':
       if (!store.currentRoom || !store.gameState) {
@@ -340,6 +408,7 @@ function App() {
           room={store.currentRoom}
           gameState={store.gameState}
           currentPlayerId={currentPlayerId}
+          availableActionsV2={availableActionsV2}
           onPlayCard={(cardId, chosenColor) => {
             if (store.currentRoom) {
               socket.playCard(store.currentRoom.code, cardId, chosenColor);
@@ -367,6 +436,14 @@ function App() {
           onToggleHost={handleToggleHost}
           chatMessages={chatMessages}
         />
+        </>
+      );
+
+    case 'gamev2':
+      return (
+        <>
+          <ConnectionStatus />
+          <GameV2 />
         </>
       );
 

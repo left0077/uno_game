@@ -51,9 +51,6 @@ interface GameStore {
   // 获取当前玩家
   getCurrentPlayerInRoom: () => Player | undefined;
   
-  // 获取可出牌
-  getPlayableCards: () => Card[];
-  
   // 是否是当前玩家的回合
   isMyTurn: () => boolean;
   
@@ -79,10 +76,7 @@ export function useGameStore(): GameStore {
     const saved = localStorage.getItem('uno-current-room');
     return saved ? JSON.parse(saved) : null;
   });
-  const [gameState, setGameStateState] = useState<GameState | null>(() => {
-    const saved = localStorage.getItem('uno-game-state');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [gameState, setGameStateState] = useState<GameState | null>(null);
   const [error, setErrorState] = useState<string | null>(null);
   const [handSortMode, setHandSortMode] = useState<'color' | 'number' | 'type' | 'smart'>('color');
 
@@ -111,17 +105,11 @@ export function useGameStore(): GameStore {
       localStorage.setItem('uno-current-room', JSON.stringify(room));
     } else {
       localStorage.removeItem('uno-current-room');
-      localStorage.removeItem('uno-game-state');
     }
   }, []);
 
   const setGameState = useCallback((state: GameState | null) => {
     setGameStateState(state);
-    if (state) {
-      localStorage.setItem('uno-game-state', JSON.stringify(state));
-    } else {
-      localStorage.removeItem('uno-game-state');
-    }
   }, []);
 
   const setError = useCallback((err: string | null) => {
@@ -143,30 +131,6 @@ export function useGameStore(): GameStore {
     return currentRoom.players.find(p => p.id === userId);
   }, [currentRoom, userId]);
 
-  const getPlayableCards = useCallback(() => {
-    const player = getCurrentPlayerInRoom();
-    if (!player || !gameState) return [];
-    
-    const topCard = gameState.discardPile[gameState.discardPile.length - 1];
-    const currentColor = gameState.currentColor;
-    
-    return player.cards.filter(card => {
-      // 万能牌随时可出
-      if (card.type === 'wild' || card.type === 'draw4') {
-        return true;
-      }
-      // 颜色匹配
-      if (card.color === currentColor) {
-        return true;
-      }
-      // 数字/类型匹配
-      if (topCard && card.value === topCard.value) {
-        return true;
-      }
-      return false;
-    });
-  }, [getCurrentPlayerInRoom, gameState]);
-
   const isMyTurn = useCallback(() => {
     if (!gameState) return false;
     return gameState.currentPlayerId === userId;
@@ -177,7 +141,6 @@ export function useGameStore(): GameStore {
     setGameStateState(null);
     setErrorState(null);
     localStorage.removeItem('uno-current-room');
-    localStorage.removeItem('uno-game-state');
   }, []);
 
   return {
@@ -200,7 +163,6 @@ export function useGameStore(): GameStore {
     showSettings,
     setShowSettings,
     getCurrentPlayerInRoom,
-    getPlayableCards,
     isMyTurn,
     reset
   };

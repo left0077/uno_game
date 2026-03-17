@@ -155,39 +155,62 @@ export class OutModeRenderer implements GameModeRenderer {
       // 只保留可以作为第一张出的牌
       const playableCards = cardList.filter(canPlayAsFirst);
       
+      // 彩虹：需要4种颜色各一张，且至少有一张可作为第一张
       if (cardList.length >= 4) {
         const colors = new Set(cardList.map(c => c.color));
         if (colors.size === 4) {
-          // 找到可以作为第一张出的彩虹组合
-          const rainbowCandidates = cardList.filter(canPlayAsFirst);
-          if (rainbowCandidates.length >= 1) {
-            const rainbowCards = cardList.filter((c, i, arr) => 
-              arr.findIndex(x => x.color === c.color) === i
-            );
-            // 确保第一张可以作为第一张出
-            if (canPlayAsFirst(rainbowCards[0])) {
-              combos.push({ type: 'rainbow', cardIds: rainbowCards.map(c => c.id), name: `彩虹${value}` });
+          // 每种颜色选一张
+          const rainbowCards: typeof cardList = [];
+          const usedColors = new Set<string>();
+          for (const card of cardList) {
+            if (card.color && !usedColors.has(card.color)) {
+              rainbowCards.push(card);
+              usedColors.add(card.color);
+            }
+          }
+          // 检查是否至少有一张可作为第一张
+          if (rainbowCards.some(c => canPlayAsFirst(c))) {
+            combos.push({ type: 'rainbow', cardIds: rainbowCards.map(c => c.id), name: `彩虹${value}` });
+          }
+        }
+      }
+      
+      // 三条：需要至少3张，且至少有一张可作为第一张
+      if (cardList.length >= 3) {
+        // 生成所有可能的三条组合（考虑所有排列，确保可出的牌作为第一张）
+        const playableIndices = cardList.map((c, i) => canPlayAsFirst(c) ? i : -1).filter(i => i >= 0);
+        
+        for (const firstIdx of playableIndices) {
+          // 从剩余牌中选2张组成三条
+          const remaining = cardList.filter((_, i) => i !== firstIdx);
+          for (let i = 0; i < remaining.length - 1; i++) {
+            for (let j = i + 1; j < remaining.length; j++) {
+              const comboCards = [cardList[firstIdx], remaining[i], remaining[j]];
+              combos.push({ 
+                type: 'three', 
+                cardIds: comboCards.map(c => c.id), 
+                name: `三条${value}` 
+              });
             }
           }
         }
       }
       
-      // 三条：需要至少3张，且第一张可出
-      if (cardList.length >= 3) {
-        for (let i = 0; i <= cardList.length - 3; i++) {
-          const comboCards = cardList.slice(i, i + 3);
-          if (canPlayAsFirst(comboCards[0])) {
-            combos.push({ type: 'three', cardIds: comboCards.map(c => c.id), name: `三条${value}` });
-          }
-        }
-      }
-      
-      // 对子：需要至少2张，且第一张可出
+      // 对子：需要至少2张，且至少有一张可作为第一张
       if (cardList.length >= 2) {
-        for (let i = 0; i <= cardList.length - 2; i++) {
-          const comboCards = cardList.slice(i, i + 2);
-          if (canPlayAsFirst(comboCards[0])) {
-            combos.push({ type: 'pair', cardIds: comboCards.map(c => c.id), name: `对子${value}` });
+        // 生成所有以可出牌为第一张的对子组合
+        for (let i = 0; i < cardList.length; i++) {
+          if (canPlayAsFirst(cardList[i])) {
+            for (let j = 0; j < cardList.length; j++) {
+              if (i !== j) {
+                const comboCards = [cardList[i], cardList[j]];
+                combos.push({ 
+                  type: 'pair', 
+                  cardIds: comboCards.map(c => c.id), 
+                  name: `对子${value}` 
+                });
+              }
+            }
           }
         }
       }

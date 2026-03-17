@@ -97,139 +97,47 @@ function getPriorityColor(priority: number): string {
 }
 
 /**
- * 惩罚响应面板组件
+ * 惩罚响应面板组件 - 简化版
  */
 export function PenaltyResponsePanel({
   options,
   pendingCount,
   onSelect,
-  allowCancel = true,
-  onCancel,
 }: PenaltyResponsePanelProps) {
+  if (options.length === 0) return null;
+
   // 按优先级排序
   const sortedOptions = [...options].sort((a, b) => b.priority - a.priority);
-  
-  // 推荐选项（最高优先级）
-  const recommendedOption = sortedOptions.find(o => o.priority >= 90);
-  
-  if (options.length === 0) {
-    return null;
-  }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
-      className="fixed bottom-[350px] left-1/2 -translate-x-1/2 z-40 w-full max-w-lg px-4"
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className="fixed top-24 left-4 z-30"
     >
-      <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-2xl p-4 shadow-2xl">
-        {/* 标题区域 */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
-              <AlertTriangle className="w-4 h-4 text-red-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">
-                ⚠️ 累积 +{pendingCount}
-              </h3>
-              <p className="text-sm text-slate-400">选择你的响应方式</p>
-            </div>
-          </div>
-          
-          {allowCancel && onCancel && (
-            <button
-              onClick={onCancel}
-              className="text-slate-400 hover:text-white transition-colors"
-            >
-              取消
-            </button>
-          )}
+      <div className="bg-slate-900/90 backdrop-blur border border-red-500/30 rounded-xl p-3 shadow-xl">
+        {/* 标题 */}
+        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-700">
+          <AlertTriangle className="w-4 h-4 text-red-400" />
+          <span className="text-sm font-bold text-white">+{pendingCount}</span>
         </div>
 
-        {/* 推荐选项（如果有） */}
-        <AnimatePresence>
-          {recommendedOption && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mb-4"
-            >
-              <button
-                onClick={() => onSelect(recommendedOption)}
-                className={`w-full p-4 rounded-xl border-2 transition-all animate-pulse
-                  ${getOptionColor(recommendedOption.type)}
-                  hover:scale-[1.02] active:scale-[0.98]
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-white/10">
-                    {getOptionIcon(recommendedOption.type)}
-                  </div>
-                  <div className="flex-1 text-left">
-                    <div className="font-bold text-lg">
-                      {recommendedOption.name}
-                    </div>
-                    <div className="text-sm opacity-80">
-                      {recommendedOption.description}
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5" />
-                </div>
-                <div className="mt-2 text-xs opacity-70">
-                  {recommendedOption.detailedEffect}
-                </div>
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 所有选项网格 */}
-        <div className="grid grid-cols-2 gap-2">
-          {sortedOptions.filter(o => o !== recommendedOption).map((option) => (
-            <motion.button
+        {/* 选项列表 */}
+        <div className="flex flex-col gap-1.5">
+          {sortedOptions.map((option) => (
+            <button
               key={option.type}
               onClick={() => onSelect(option)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={`p-3 rounded-lg border transition-all text-left
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-all
                 ${getOptionColor(option.type)}
+                hover:brightness-110
               `}
             >
-              <div className="flex items-start gap-2">
-                <div className="p-1.5 rounded bg-white/10 shrink-0">
-                  {getOptionIcon(option.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate">
-                    {option.name}
-                  </div>
-                  <div className="text-xs opacity-70 truncate">
-                    {option.description}
-                  </div>
-                </div>
-              </div>
-              
-              {/* 结果预览 */}
-              <div className="mt-2 text-xs">
-                <span className={`inline-block px-1.5 py-0.5 rounded ${getPriorityColor(option.priority)}`}>
-                  {getPriorityLabel(option.priority)}
-                </span>
-                <span className="ml-1 opacity-60">
-                  {option.outcome.description}
-                </span>
-              </div>
-            </motion.button>
+              {getOptionIcon(option.type)}
+              <span className="font-medium">{option.name}</span>
+            </button>
           ))}
-        </div>
-
-        {/* 提示信息 */}
-        <div className="mt-4 p-3 bg-slate-800/50 rounded-lg">
-          <p className="text-xs text-slate-400 text-center">
-            💡 提示：使用<Zap className="w-3 h-3 inline mx-1"/>跟+可以转移惩罚，
-            <Shield className="w-3 h-3 inline mx-1"/>连打可以减免惩罚
-          </p>
         </div>
       </div>
     </motion.div>

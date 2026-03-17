@@ -1,186 +1,166 @@
-# 🎮 Uno Online
+# UNO Online
 
-在线Uno游戏，支持2-8人同时游戏，支持真人+AI混合对战。
+> 🎮 在线 UNO 游戏，支持实时多人对战
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-
-🔗 **在线试玩**: https://left0077.github.io/uno/
-
----
-
-## ✨ 特性
-
-### 核心功能
-- ✅ **2-8人同时在线游戏**
-- ✅ **真人玩家 + AI机器人混合对战**
-- ✅ **三种AI难度**（简单/普通/困难）
-- ✅ **断线重连** - 刷新页面自动恢复游戏
-- ✅ **邀请链接** - 一键分享房间链接
-
-### 游戏规则
-- ✅ **多牌同出规则** - 相同数字/颜色可一起出
-- ✅ **抢打出牌规则** - 相同牌可随时插队
-- ✅ **连打规则** - +2/+4可叠加
-- ✅ **排名模式** - 多轮积分赛
-- ✅ **房间设置** - 房主可开关规则
-
-### 用户体验
-- ✅ **智能手牌提示**（可出牌高亮）
-- ✅ **分类排序功能**（颜色/数字/智能）
-- ✅ **Emoji快捷聊天**
-- ✅ **响应式设计**（PC+移动端）
-- ✅ **实时连接状态**显示
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18%2B-61dafb)](https://react.dev/)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.0%2B-black)](https://socket.io/)
 
 ---
 
 ## 🚀 快速开始
 
-### 在线试玩
-直接访问：https://left0077.github.io/uno/
-
-> 💡 **提示**: 后端使用 Render 免费版，首次访问可能需要等待 30 秒冷启动
-
-### 本地运行
-
-#### 环境要求
-- Node.js 18+
-- npm 9+
-
-#### 安装运行
-
 ```bash
 # 克隆项目
-git clone <repo-url>
-cd Kimi_Uno
+git clone https://github.com/left0077/uno.git
+cd uno
 
 # 安装依赖
-cd client && npm install
-cd ../server && npm install
+npm install
 
-# 启动后端（终端1）
-cd server && npm run dev
+# 启动开发环境
+npm run dev
+```
 
-# 启动前端（终端2）
-cd client && npm run dev
+访问 http://localhost:3000 开始游戏
 
-# 打开浏览器
-open http://localhost:5173
+---
+
+## 📂 项目结构
+
+```
+uno/
+├── client/           # 🎨 前端 (React + Vite)
+│   ├── src/
+│   │   ├── pages/        # 页面组件
+│   │   ├── hooks/        # React Hooks
+│   │   └── core/         # 核心逻辑
+│   └── dist/             # 构建输出
+│
+├── server/           # 🖥️ 后端 (Node.js + Socket.IO)
+│   ├── src/
+│   │   ├── game/         # 游戏逻辑
+│   │   ├── socket/       # Socket 处理器
+│   │   └── test/         # 单元测试
+│   └── tests/            # 独立测试脚本
+│
+├── e2e/              # 🧪 E2E 测试 (Playwright)
+│   ├── tests/            # 主力测试
+│   ├── scripts/          # 独立脚本
+│   └── puppeteer/        # Puppeteer 测试
+│
+├── shared/           # 🔗 共享类型定义
+│   └── types/
+│
+└── docs/             # 📚 文档中心
+    ├── v1.0/             # v1.0 稳定版文档
+    ├── v2.0/             # v2.0 开发版文档
+    ├── rules/            # 游戏规则
+    └── architecture/     # 架构设计
 ```
 
 ---
 
-## 🎮 游戏截图
+## ✨ 核心特性
 
-### 首页
-<img src="docs/screenshots/home.png" alt="首页" width="600">
+### v2.0 (当前开发版)
+- **Action API v2.0** - 服务器权威的游戏动作接口
+- **Out 模式** - 大逃杀玩法，手牌上限 20 张
+- **连打系统** - 对子/三条/彩虹/顺子组合出牌
+- **彩虹转移** - 将惩罚转移给任意玩家
+- **反转反击** - 用反转牌弹回惩罚
 
-### 房间
-<img src="docs/screenshots/room.png" alt="房间" width="600">
-
-### 游戏
-<img src="docs/screenshots/game.png" alt="游戏" width="600">
-
----
-
-## 📋 游戏规则
-
-### 基础规则
-1. 每位玩家初始7张牌
-2. 轮流出牌，必须颜色或数字匹配
-3. 万能牌可随时出，+4需要满足条件
-4. 剩1张牌时必须喊UNO
-5. 先出完牌者获胜
-
-### 扩展规则（可在房间设置中开关）
-
-| 规则 | 说明 |
-|------|------|
-| **多牌同出** | 相同数字或颜色的牌可以一起出 |
-| **抢打出牌** | 手中有与弃牌堆完全相同的牌时可以插队出 |
-| **连打规则** | +2可以叠加+2，+4可以叠加+4，无法叠加者摸所有累计牌 |
-| **排名模式** | 游戏继续直到所有玩家排名，按积分排序 |
-
-详细规则请查看 [docs/GAME_RULES.md](docs/GAME_RULES.md)
+### v1.0 (稳定版)
+- **经典 UNO** - 标准规则完整实现
+- **实时对战** - Socket.IO 低延迟通信
+- **多人游戏** - 支持 2-8 人同时游戏
+- **房间系统** - 创建/加入房间，支持邀请链接
 
 ---
 
 ## 🛠️ 技术栈
 
-### 前端
-- React 18 + TypeScript
-- Vite + TailwindCSS
-- Framer Motion（动画）
-- Socket.IO Client
-
-### 后端
-- Node.js + Express
-- Socket.IO
-- TypeScript
-
-### 部署
-- 前端: GitHub Pages
-- 后端: Render
+| 层级 | 技术 |
+|------|------|
+| **前端** | React 18 + TypeScript + Vite + Tailwind CSS |
+| **后端** | Node.js + Express + Socket.IO |
+| **测试** | Playwright + 自定义测试框架 |
+| **部署** | Docker + GitHub Actions |
 
 ---
 
-## 📁 项目结构
+## 📖 文档导航
 
-```
-Kimi_Uno/
-├── client/          # 前端项目 (React + Vite)
-├── server/          # 后端项目 (Express + Socket.IO)
-├── shared/          # 共享类型定义
-├── docs/            # 文档
-├── e2e/             # 端到端测试
-└── README.md        # 本文件
-```
+### 按版本
+- [v2.0 文档](./docs/v2.0/README.md) - Action API v2.0、Out 模式
+- [v1.0 文档](./docs/v1.0/README.md) - 经典 UNO、基础架构
 
----
+### 按主题
+- [游戏规则](./docs/rules/README.md) - 经典模式 & Out 模式
+- [架构设计](./docs/architecture/README.md) - 系统架构
 
-## 📚 文档
-
-- [API文档](docs/API.md) - 后端接口文档
-- [游戏规则](docs/GAME_RULES.md) - 详细游戏规则
-- [UI设计](docs/UI_DESIGN.md) - 界面设计规范
-- [测试计划](docs/TEST_PLAN.md) - 测试用例和结果
-- [交付文档](DELIVERY.md) - 项目交付说明
+### 开发相关
+- [API 设计](./docs/v2.0/API_DESIGN.md) - Action API v2.0
+- [测试计划](./docs/v2.0/TEST_PLAN.md) - 测试策略
 
 ---
 
 ## 🧪 测试
 
 ```bash
-# 运行后端单元测试
-cd server && npm test
+# 运行所有测试
+npm test
 
-# 运行前端构建测试
-cd client && npm run build
+# 单元测试
+npm run test:unit
 
-# 运行E2E测试
-cd e2e && npm test
+# E2E 测试
+cd e2e && npx playwright test
+
+# 独立测试脚本
+node server/tests/test-game.mjs
 ```
 
 ---
 
-## 🐛 已知问题
+## 🚀 部署
 
-| 问题 | 说明 | 解决方案 |
-|------|------|---------|
-| Render冷启动 | 免费版15分钟无访问会休眠，首次连接需等待30秒 | 等待或考虑升级到付费版 |
+### Docker 部署
+```bash
+docker build -t uno-server ./server
+docker run -p 3001:3001 uno-server
+```
+
+### 手动部署
+```bash
+cd server
+npm install
+npm run build
+npm start
+```
+
+---
+
+## 📜 版本历史
+
+| 版本 | 日期 | 说明 |
+|------|------|------|
+| v2.0.0 | 2026-03-17 | Action API v2.0、Out 模式 |
+| v1.0.0 | 2026-03-15 | 经典 UNO 稳定版 |
 
 ---
 
 ## 🤝 贡献
 
-欢迎提交Issue和Pull Request！
+欢迎提交 Issue 和 PR！
+
+1. Fork 项目
+2. 创建分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送分支 (`git push origin feature/AmazingFeature`)
+5. 创建 Pull Request
 
 ---
 
-## 📄 许可证
-
-MIT License
-
----
-
-**Enjoy playing Uno Online! 🎴**
+> 💡 **提示**: 项目文档已按版本整理，详情请查看 [docs/](./docs/) 目录

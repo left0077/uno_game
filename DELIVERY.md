@@ -91,7 +91,7 @@ cd server && npm start
 ```bash
 git checkout main
 npm run build
-npm run deploy
+npm start
 ```
 
 ## 技术支持

@@ -131,14 +131,16 @@ export function setupSocketHandlers(io: Server): void {
     socket.on('player:reconnect', (data: { roomCode: string; userId: string }) => {
       const room = roomManager.getRoom(data.roomCode);
       if (!room) {
-        socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
+        // 重连失败不显示错误（可能是正常的新建房间流程）
+        socket.emit('player:reconnectFailed', { reason: 'ROOM_NOT_FOUND' });
         return;
       }
       
       // 查找断开的玩家（使用固定的 userId）
       const player = room.players.find(p => p.id === data.userId && !p.isConnected);
       if (!player) {
-        socket.emit(SocketEvents.ERROR, { code: 'PLAYER_NOT_FOUND', message: '玩家不存在或已重新连接' });
+        // 重连失败不显示错误（玩家可能已经在正常游戏中）
+        socket.emit('player:reconnectFailed', { reason: 'PLAYER_NOT_FOUND' });
         return;
       }
       
@@ -153,6 +155,18 @@ export function setupSocketHandlers(io: Server): void {
       player.isAI = false;
       player.aiType = undefined;
       player.aiDifficulty = undefined;
+      
+      // 同步更新 gameState 中的玩家状态
+      if (room.gameState) {
+        const gameStatePlayer = room.gameState.players.find(p => p.id === data.userId);
+        if (gameStatePlayer) {
+          gameStatePlayer.isConnected = true;
+          gameStatePlayer.disconnectedAt = undefined;
+          gameStatePlayer.isAI = false;
+          gameStatePlayer.aiType = undefined;
+          gameStatePlayer.aiDifficulty = undefined;
+        }
+      }
       
       // 加入房间
       socket.join(data.roomCode);

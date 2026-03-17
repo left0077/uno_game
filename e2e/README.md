@@ -1,164 +1,103 @@
-# 🎮 Uno Online E2E 测试
+# E2E 测试
 
-使用 Playwright 进行的端到端自动化测试。
+> UNO Online 端到端测试
 
-## 📋 测试覆盖范围
+---
 
-### 1. 基础功能测试 (`basic.spec.ts`)
-- ✅ 首页加载
-- ✅ 昵称保存
-- ✅ 创建房间
-- ✅ 加入房间
-- ✅ 邀请链接自动填充
-- ✅ 添加AI
-- ✅ 连接状态显示
+## 📂 目录结构
 
-### 2. 断线重连测试 (`reconnect.spec.ts`)
-- ✅ 页面刷新后自动重连
-- ✅ 游戏中刷新恢复状态
-- ✅ 重连后可以继续出牌
-- ✅ 重连后倒计时正常
-- ✅ 断网提示
-- ✅ userId 持久化
+```
+e2e/
+├── tests/              # Playwright 测试（推荐）
+│   ├── action-api.spec.ts      # Action API v2.0 测试
+│   ├── core-features/          # 核心功能测试
+│   ├── game-modes/             # 游戏模式测试
+│   ├── regression/             # 回归测试
+│   ├── bugs/                   # Bug 修复验证
+│   └── utils/                  # 测试工具
+│
+├── puppeteer/          # Puppeteer 测试（旧版）
+│   ├── puppeteer-test.mjs
+│   └── puppeteer-full-test.mjs
+│
+├── scripts/            # 独立测试脚本
+│   ├── test-action-api.mjs
+│   ├── test-game.mjs
+│   ├── test-host.mjs
+│   └── ...
+│
+├── archive/            # 归档文档
+│   └── ux-evaluation*.mjs
+│
+├── playwright.config.ts        # 生产环境配置
+├── playwright.config.local.ts  # 本地环境配置
+└── package.json
+```
 
-### 3. 游戏流程测试 (`gameplay.spec.ts`)
-- ✅ 开始游戏
-- ✅ 查看手牌
-- ✅ 摸牌功能
-- ✅ 出牌功能
-- ✅ 当前颜色指示
-- ✅ 倒计时显示
-- ✅ 连打规则提示
-- ✅ UNO 喊话
-- ✅ 排名模式显示
-
-### 4. 特色功能测试 (`features.spec.ts`)
-- ✅ Emoji 聊天
-- ✅ 邀请链接
-- ✅ 房间设置
-- ✅ 游戏结束显示
+---
 
 ## 🚀 快速开始
 
-### 安装依赖
+### Playwright 测试（推荐）
 
 ```bash
-cd e2e
+# 安装依赖
 npm install
-npx playwright install chromium
-```
 
-### 运行测试
-
-```bash
 # 运行所有测试
-npm test
-
-# 运行所有测试（可见浏览器）
-npm run test:headed
+npx playwright test
 
 # 运行特定测试
-npm run test:basic      # 基础功能
-npm run test:reconnect  # 断线重连
-npm run test:gameplay   # 游戏流程
-npm run test:features   # 特色功能
+npx playwright test tests/action-api.spec.ts
 
-# 调试模式（UI）
-npm run test:ui
-
-# 生成报告
-npm run report
+# 本地环境测试
+npx playwright test --config=playwright.config.local.ts
 ```
 
-### 使用交互式脚本
+### 独立测试脚本
 
 ```bash
-./run-tests.sh
+# 需要服务器运行在 localhost:3001
+node scripts/test-game.mjs
+node scripts/test-host.mjs
 ```
 
-## 📝 测试配置
+---
 
-### 测试环境
+## 📝 测试分类
 
-默认测试 **生产环境**：
-- 前端: `https://left0077.github.io/uno/`
-- 后端: `https://uno-server-jbbr.onrender.com`
+### 1. Playwright 测试 (`tests/`)
 
-### 测试超时
+| 目录 | 说明 |
+|------|------|
+| `action-api.spec.ts` | Action API v2.0 完整测试 |
+| `core-features/` | 核心功能（托管、聊天等） |
+| `game-modes/` | 游戏模式（经典、Out） |
+| `regression/` | 回归测试 |
+| `bugs/` | Bug 修复验证 |
 
-- 操作超时: 15秒
-- 导航超时: 20秒
-- Render 冷启动可能需要额外等待时间
+### 2. 独立脚本 (`scripts/`)
+
+| 脚本 | 说明 |
+|------|------|
+| `test-action-api.mjs` | Action API 测试 |
+| `test-game.mjs` | 游戏流程测试 |
+| `test-host.mjs` | 托管功能测试 |
+| `test-bot-auto-play.mjs` | AI 自动出牌测试 |
+| `test-hand-cards.mjs` | 手牌显示测试 |
+| `test-play-card.mjs` | 出牌功能测试 |
+
+---
+
+## ⚙️ 配置文件
+
+| 文件 | 用途 |
+|------|------|
+| `playwright.config.ts` | 生产环境配置 (GitHub Pages) |
+| `playwright.config.local.ts` | 本地开发配置 (localhost:4173) |
+
+---
 
 ## 📊 测试报告
 
-测试完成后生成:
-- **HTML 报告**: `playwright-report/index.html`
-- **截图**: `test-results/*.png`
-- **视频**: 失败时自动录制
-
-查看报告:
-```bash
-npx playwright show-report
-```
-
-## 🔧 开发测试
-
-### 添加新测试
-
-1. 在 `tests/` 目录创建新的 `.spec.ts` 文件
-2. 使用 Playwright API 编写测试
-3. 运行测试验证
-
-示例:
-```typescript
-import { test, expect } from '@playwright/test';
-
-test('测试描述', async ({ page }) => {
-  await page.goto('https://left0077.github.io/uno/');
-  // ... 测试步骤
-});
-```
-
-### 调试技巧
-
-1. **使用 UI 模式**: `npx playwright test --ui`
-2. **单测试调试**: `npx playwright test -g "测试名" --debug`
-3. **保留浏览器**: `npx playwright test --headed --workers=1`
-
-## ⚠️ 注意事项
-
-1. **Render 冷启动**: 后端首次启动可能需要 30-60 秒
-2. **并发限制**: 为避免房间冲突，测试使用单 worker 模式
-3. **网络依赖**: 测试需要稳定的网络连接
-4. **状态清理**: 每个测试独立运行，不会互相影响
-
-## 📈 CI/CD 集成
-
-可以在 GitHub Actions 中运行:
-
-```yaml
-- name: Run E2E Tests
-  run: |
-    cd e2e
-    npm install
-    npx playwright install chromium
-    npm test
-```
-
-## 🐛 故障排除
-
-### 测试超时
-- 检查网络连接
-- 增加超时配置
-- 等待 Render 服务启动
-
-### 浏览器启动失败
-```bash
-npx playwright install --with-deps chromium
-```
-
-### 元素找不到
-- 使用 `page.waitForTimeout()` 增加等待
-- 检查选择器是否正确
-- 查看截图定位问题
+测试报告和截图保存在 `test-results/` 目录

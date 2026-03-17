@@ -26,8 +26,7 @@ export interface UseGameActionsReturn {
   // === 数据 ===
   /** 完整的可用动作数据 (v2) */
   actions: AvailableActions | null;
-  /** 是否为 v2 API */
-  isV2: boolean;
+
   /** 加载状态 */
   loading: boolean;
   /** 错误信息 */
@@ -36,6 +35,8 @@ export interface UseGameActionsReturn {
   // === 便捷访问 ===
   /** 游戏状态信息 */
   state: GameStateInfo | null;
+  /** 倒计时信息 */
+  countdown: { total: number; remaining: number; warning: boolean } | null;
   /** 可出牌列表 */
   playableCards: PlayableCard[];
   /** 连打启动牌列表 */
@@ -81,8 +82,7 @@ export interface UseGameActionsReturn {
   /** 回滚乐观更新 */
   rollback: () => void;
   
-  // === v1 兼容 ===
-  /** v1 兼容：可出牌ID集合 */
+  /** 可出牌ID集合 */
   playableCardIds: Set<string>;
 }
 
@@ -103,6 +103,7 @@ const mockApiCall = async <T>(action: string, data: unknown): Promise<T> => {
  * @param gameState - 当前游戏状态
  * @param playerId - 当前玩家ID
  * @param options - 可选配置
+ * @param externalActions - 外部传入的可用动作（从 socket 事件获取）
  */
 export function useGameActions(
   gameState: GameState | null,
@@ -112,7 +113,8 @@ export function useGameActions(
     refreshInterval?: number;
     /** 是否启用乐观更新 */
     enableOptimistic?: boolean;
-  }
+  },
+  externalActions?: AvailableActions | null
 ): UseGameActionsReturn {
   const { refreshInterval = 0, enableOptimistic = true } = options || {};
   
@@ -126,29 +128,35 @@ export function useGameActions(
   const lastValidStateRef = useRef<AvailableActions | null>(null);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // === 版本检测 ===
-  const apiVersion = gameState?.actionApiVersion || '1.0';
-  const isV2 = apiVersion === '2.0';
+
   
   // === 数据解析 ===
   const parsedActions = useMemo(() => {
     if (!gameState || !playerId) return null;
     
-    // v2: 从 gameState.availableActions 获取
-    if (isV2 && gameState.availableActions?.[playerId]) {
+    // 优先使用外部传入的 actions（从 socket 事件获取）
+    if (externalActions && isV2Actions(externalActions)) {
+      return externalActions;
+    }
+    
+    // 从 gameState.availableActions 获取
+    if (gameState.availableActions?.[playerId]) {
       const v2Actions = gameState.availableActions[playerId];
       if (isV2Actions(v2Actions)) {
         return v2Actions;
       }
     }
     
-    // v1 降级：从旧格式构建
     return null;
-  }, [gameState, playerId, isV2]);
+  }, [gameState, playerId, externalActions]);
   
   // === 便捷数据访问 ===
   const state = useMemo(() => {
     return actions?.state || null;
+  }, [actions]);
+  
+  const countdown = useMemo(() => {
+    return actions?.state?.countdown || null;
   }, [actions]);
   
   const playableCards = useMemo(() => {
@@ -458,12 +466,12 @@ export function useGameActions(
   return {
     // 数据
     actions,
-    isV2,
     loading,
     error,
     
     // 便捷访问
     state,
+    countdown,
     playableCards,
     comboStarters,
     penaltyOptions,
@@ -490,7 +498,6 @@ export function useGameActions(
     hasOptimisticUpdate: !!optimisticUpdate,
     rollback,
     
-    // v1 兼容
     playableCardIds,
   };
 }

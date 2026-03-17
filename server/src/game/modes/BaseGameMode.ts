@@ -65,26 +65,29 @@ export class BaseGameMode implements GameMode {
       throw new Error(`Not enough cards. Need ${totalNeeded}, have ${deck.length}`);
     }
     
-    // 发牌
-    room.players.forEach(player => {
+    // 发牌 - 深拷贝玩家数据到 gameState
+    const gamePlayers: Player[] = room.players.map(player => {
       const cards = deck.splice(-this.config.cardsPerPlayer, this.config.cardsPerPlayer);
-      player.cards = cards;
-      player.cardCount = cards.length;
-      player.hasCalledUno = false;
-      player.eliminated = false;
+      return {
+        ...player,
+        cards,
+        cardCount: cards.length,
+        hasCalledUno: false,
+        eliminated: false
+      };
     });
     
     const now = Date.now();
     
     const state: GameState = {
-      currentPlayerId: room.players[0].id,
+      currentPlayerId: gamePlayers[0].id,
       direction: 'clockwise',
       deck,
       discardPile,
       currentColor: firstCard.color,
       turnTimer: this.config.turnTimer,
       turnStartTime: now,
-      players: room.players,
+      players: gamePlayers,
       rankings: [],
       isRoundEnded: false
     };
@@ -293,6 +296,24 @@ export class BaseGameMode implements GameMode {
       state.currentColor = card.color;
     }
     
+    // ✅ 修复：检查是否出完牌，如果是则立即结束游戏
+    if (player.cards.length === 0) {
+      console.log(`[BaseGameMode] 玩家 ${player.nickname} 出完所有牌，游戏结束`);
+      
+      // 设置排名
+      if (!state.rankings) state.rankings = [];
+      if (!state.rankings.includes(player.id)) {
+        state.rankings.push(player.id);
+      }
+      
+      state.winner = player.id;
+      state.isRoundEnded = true;
+      state.turnStartTime = Date.now();
+      
+      // 跳过所有后续效果（pendingDraw、applyCardEffect等）
+      return state;
+    }
+    
     // 先处理已有的pendingDraw（如果被叠加）
     this.handlePendingDraw(state, card, playerId);
     
@@ -455,6 +476,22 @@ export class BaseGameMode implements GameMode {
     const player = state.players.find(p => p.id === playerId);
     if (!player) return;
     
+    // ✅ 修复：检查玩家是否已完成或已淘汰
+    if (player.cards.length === 0) {
+      console.log(`[BaseGameMode] 玩家 ${player.nickname} 已出完牌，不再发牌`);
+      return;
+    }
+    
+    if (player.eliminated) {
+      console.log(`[BaseGameMode] 玩家 ${player.nickname} 已被淘汰，不再发牌`);
+      return;
+    }
+    
+    if (state.rankings?.includes(player.id)) {
+      console.log(`[BaseGameMode] 玩家 ${player.nickname} 已排名，不再发牌`);
+      return;
+    }
+    
     for (let i = 0; i < count; i++) {
       if (state.deck.length === 0) {
         this.reshuffleDeck(state);
@@ -607,7 +644,8 @@ export class BaseGameMode implements GameMode {
       if (jumpInCards.length > 0) {
         actions.actions.special.jumpIn = {
           enabled: true,
-          reason: `可以抢牌: ${jumpInCards.length}张牌匹配`
+          reason: `可以抢牌: ${jumpInCards.length}张牌匹配`,
+          cardIds: jumpInCards.map(c => c.id)
         };
       }
     }
@@ -787,7 +825,8 @@ export class BaseGameMode implements GameMode {
       const jumpInCards = this.getJumpInCards(player.cards, topCard);
       actions.actions.special.jumpIn = {
         enabled: jumpInCards.length > 0,
-        reason: jumpInCards.length > 0 ? `可以抢牌: ${jumpInCards.length}张` : '没有可抢的牌'
+        reason: jumpInCards.length > 0 ? `可以抢牌: ${jumpInCards.length}张` : '没有可抢的牌',
+        cardIds: jumpInCards.length > 0 ? jumpInCards.map(c => c.id) : undefined
       };
       if (jumpInCards.length > 0) {
         rulesChecked.push(`can_jump_in_${jumpInCards.length}`);

@@ -207,7 +207,8 @@ interface OtherActionOption {
 # 紧急回滚到v1.x
 git checkout main
 git branch -D refactor/v2.0-server-authority
-npm run deploy
+npm run build
+npm start
 ```
 
 ## 验收标准

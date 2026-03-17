@@ -233,19 +233,19 @@ export class OutMode extends BaseGameMode {
       return { valid: false, error: `Invalid ${comboDef.name}` };
     }
     
-    // ✅ 关键：验证第一张牌是否可以合法打出（与弃牌堆顶部匹配）
-    const firstCard = selectedCards[0];
+    // ✅ 关键：验证组合中至少有一张牌可以合法打出（与弃牌堆顶部匹配）
     const topCard = state.discardPile[state.discardPile.length - 1];
     
-    // 检查第一张牌是否与弃牌堆顶部匹配（颜色或数字）
-    const isMatch = 
-      firstCard.color === state.currentColor || 
-      firstCard.value === topCard.value ||
-      firstCard.type === 'wild' || 
-      firstCard.type === 'draw4';
+    // 检查组合中是否有牌与弃牌堆顶部匹配
+    const hasMatchingCard = selectedCards.some(card => 
+      card.color === state.currentColor || 
+      card.value === topCard.value ||
+      card.type === 'wild' || 
+      card.type === 'draw4'
+    );
     
-    if (!isMatch) {
-      return { valid: false, error: 'First card must match the top card (color or value)' };
+    if (!hasMatchingCard) {
+      return { valid: false, error: 'Combo must contain at least one card matching the top card (color or value)' };
     }
     
     if (comboType === 'rainbow' && !action.targetId) {
@@ -272,6 +272,21 @@ export class OutMode extends BaseGameMode {
         playedCards.push(player.cards[cardIndex]);
         player.cards.splice(cardIndex, 1);
       }
+    }
+    
+    // ✅ 修复：将匹配的牌放在第一位（如果还没在第一位）
+    const topCard = state.discardPile[state.discardPile.length - 1];
+    const matchingIndex = playedCards.findIndex(card => 
+      card.color === state.currentColor || 
+      card.value === topCard.value ||
+      card.type === 'wild' || 
+      card.type === 'draw4'
+    );
+    
+    if (matchingIndex > 0) {
+      // 把匹配的牌放到第一位
+      const [matchingCard] = playedCards.splice(matchingIndex, 1);
+      playedCards.unshift(matchingCard);
     }
     
     state.discardPile.push(...playedCards);
@@ -594,6 +609,29 @@ export class OutMode extends BaseGameMode {
   }
   
   /**
+   * 重写 canPlayCard - Out模式支持反转反击
+   */
+  protected canPlayCard(state: GameState, card: Card, player: Player): boolean {
+    // 有累积惩罚时
+    if (state.pendingDraw && state.pendingDraw > 0) {
+      // 可以跟+（叠加）
+      if (this.canStackCard(card, state.pendingDrawType)) {
+        return true;
+      }
+      
+      // ✅ Out模式特有：颜色匹配的反转牌可以反击
+      if (card.type === 'reverse' && card.color === state.currentColor) {
+        return true;
+      }
+      
+      return false;
+    }
+    
+    // 正常回合：使用父类逻辑
+    return super.canPlayCard(state, card, player);
+  }
+  
+  /**
    * 重写胜利条件 - 支持淘汰机制
    * 
    * 胜利条件（按优先级）：
@@ -724,7 +762,8 @@ export class OutMode extends BaseGameMode {
       if (jumpInCards.length > 0) {
         actions.actions.special.jumpIn = {
           enabled: true,
-          reason: `可以抢牌: ${jumpInCards.length}张牌匹配`
+          reason: `可以抢牌: ${jumpInCards.length}张牌匹配`,
+          cardIds: jumpInCards.map(c => c.id)
         };
       }
     }
@@ -798,9 +837,13 @@ export class OutMode extends BaseGameMode {
     }
     
     // 2. 反转反击（Out模式特有）
-    const reverseCards = player.cards.filter(c => c.type === 'reverse');
+    // ✅ 修复：只选择颜色匹配的反转牌
+    const reverseCards = player.cards.filter(c => 
+      c.type === 'reverse' && 
+      this.canPlayCardForCombo(c, state.currentColor, topCard)
+    );
     if (reverseCards.length > 0) {
-      console.log(`[ActionAPI] [OutMode] 找到反转牌: ${reverseCards.length}张`);
+      console.log(`[ActionAPI] [OutMode] 找到可反击的反转牌: ${reverseCards.length}张`);
       for (const card of reverseCards) {
         const playableCard: PlayableCard = {
           cardId: card.id,
@@ -963,7 +1006,8 @@ export class OutMode extends BaseGameMode {
       const jumpInCards = this.getJumpInCards(player.cards, topCard);
       actions.actions.special.jumpIn = {
         enabled: jumpInCards.length > 0,
-        reason: jumpInCards.length > 0 ? `可以抢牌: ${jumpInCards.length}张` : '没有可抢的牌'
+        reason: jumpInCards.length > 0 ? `可以抢牌: ${jumpInCards.length}张` : '没有可抢的牌',
+        cardIds: jumpInCards.length > 0 ? jumpInCards.map(c => c.id) : undefined
       };
       if (jumpInCards.length > 0) {
         rulesChecked.push(`can_jump_in_${jumpInCards.length}`);
@@ -1095,6 +1139,11 @@ export class OutMode extends BaseGameMode {
           const rainbowCards = cardList.filter((c, i, arr) => 
             arr.findIndex(x => x.color === c.color) === i
           );
+          
+          // ✅ 修复：检查第一张彩虹牌是否可出
+          if (!this.canPlayCardForCombo(rainbowCards[0], state.currentColor, state.discardPile[state.discardPile.length - 1])) {
+            return null; // 不能合法出牌，不返回彩虹选项
+          }
           
           // 生成目标候选列表
           const candidates = state.players

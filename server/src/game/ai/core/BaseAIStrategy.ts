@@ -39,7 +39,7 @@ export abstract class BaseAIStrategy {
   protected capabilities: Set<AICapability>;
   protected memory?: GameMemory;
   protected lastEmojiTime: number = 0;
-  protected emojiCooldown: number = 3000;
+  protected emojiCooldown: number = 8000; // 8秒冷却，降低表情频率
   
   public onSendEmoji?: (emoji: EmojiType, target?: string) => void;
   

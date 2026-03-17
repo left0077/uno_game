@@ -24,6 +24,7 @@ interface RoomProps {
   onRemoveAI: (aiId: string) => void;
   onKickPlayer: (playerId: string) => void;
   onStartGame: () => void;
+  onStartGameV2?: () => void;  // V2 版本
   onUpdateSettings?: (settings: Partial<RoomSettings>) => void;
   error: string | null;
 }
@@ -48,6 +49,7 @@ export function Room({
   onRemoveAI,
   onKickPlayer,
   onStartGame,
+  onStartGameV2,
   onUpdateSettings,
   error
 }: RoomProps) {
@@ -207,18 +209,32 @@ export function Room({
 
             {/* 开始游戏/再来一局按钮 */}
             {isHost && (room.status === 'waiting' || room.status === 'finished') && (
-              <button
-                onClick={onStartGame}
-                disabled={!canStart}
-                className="w-full mt-4 flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed rounded-xl text-white font-semibold text-lg shadow-lg shadow-green-600/25 transition-all"
-              >
-                <Play className="w-6 h-6" />
-                {room.players.length < 2 
-                  ? '至少需要2人才能开始' 
-                  : room.status === 'finished' 
-                    ? '再来一局' 
-                    : '开始游戏'}
-              </button>
+              <>
+                <button
+                  onClick={onStartGame}
+                  disabled={!canStart}
+                  className="w-full mt-4 flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed rounded-xl text-white font-semibold text-lg shadow-lg shadow-green-600/25 transition-all"
+                >
+                  <Play className="w-6 h-6" />
+                  {room.players.length < 2 
+                    ? '至少需要2人才能开始' 
+                    : room.status === 'finished' 
+                      ? '再来一局 (V1)' 
+                      : '开始游戏 (V1)'}
+                </button>
+                
+                {/* V2 Out 模式 */}
+                {onStartGameV2 && (
+                  <button
+                    onClick={onStartGameV2}
+                    disabled={!canStart}
+                    className="w-full mt-3 flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed rounded-xl text-white font-semibold shadow-lg shadow-purple-600/25 transition-all"
+                  >
+                    <span className="text-xs bg-yellow-300 text-purple-900 px-2 py-0.5 rounded font-bold">V2</span>
+                    Out模式 (新架构)
+                  </button>
+                )}
+              </>
             )}
           </div>
 

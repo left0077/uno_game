@@ -28,6 +28,14 @@ interface UseSocketReturn extends SocketState {
   toggleHost: (roomCode: string, enabled: boolean) => void;
 }
 
+// V2 API 可用动作
+export interface AvailableActionsV2 {
+  draw?: { enabled: boolean; reason?: string };
+  play?: { enabled: boolean; cards: Array<{ cardId: string; reason?: string }>; reason?: string };
+  combo?: { enabled: boolean; starters: Array<{ comboType: string; cardIds: string[] }>; reason?: string };
+  special?: { jumpIn?: { enabled: boolean; cardIds: string[] }; unoCall?: { enabled: boolean }; challengeUno?: { enabled: boolean; targetId?: string } };
+}
+
 export function useSocket(
   serverUrl: string,
   userId: string,
@@ -41,7 +49,8 @@ export function useSocket(
   onGameState?: (gameState: GameState) => void,
   onGameEnded?: (data: { winner: Player }) => void,
   onReceiveMessage?: (msg: { type: string; content: string; playerId: string; playerName: string; timestamp: number }) => void,
-  onError?: (error: { code: string; message: string }) => void
+  onError?: (error: { code: string; message: string }) => void,
+  onAvailableActions?: (actions: AvailableActionsV2) => void
 ): UseSocketReturn {
   const socketRef = useRef<Socket | null>(null);
   const [state, setState] = useState<SocketState>({
@@ -64,7 +73,8 @@ export function useSocket(
     onGameState,
     onGameEnded,
     onReceiveMessage,
-    onError
+    onError,
+    onAvailableActions
   });
   
   // 更新 ref 中的回调
@@ -79,9 +89,10 @@ export function useSocket(
       onGameState,
       onGameEnded,
       onReceiveMessage,
-      onError
+      onError,
+      onAvailableActions
     };
-  }, [onRoomCreated, onRoomJoined, onRoomUpdated, onPlayerJoined, onPlayerLeft, onGameStarted, onGameState, onGameEnded, onReceiveMessage, onError]);
+  }, [onRoomCreated, onRoomJoined, onRoomUpdated, onPlayerJoined, onPlayerLeft, onGameStarted, onGameState, onGameEnded, onReceiveMessage, onError, onAvailableActions]);
 
   // 初始化Socket连接
   useEffect(() => {
@@ -178,6 +189,13 @@ export function useSocket(
     socket.on('game:challengeResult', (data) => {
       if (callbacksRef.current.onError) {
         callbacksRef.current.onError({ code: data.success ? 'CHALLENGE_SUCCESS' : 'CHALLENGE_FAILED', message: data.message });
+      }
+    });
+
+    // V2 API 可用动作
+    socket.on('game:availableActions', (data) => {
+      if (callbacksRef.current.onAvailableActions) {
+        callbacksRef.current.onAvailableActions(data.availableActions);
       }
     });
 
