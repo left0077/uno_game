@@ -1,310 +1,335 @@
+/**
+ * useSocket - Socket 连接 Hook
+ * 
+ * 功能：
+ * 1. 连接 Socket 服务器
+ * 2. 管理连接状态
+ * 3. 提供房间和游戏操作方法
+ */
+
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { Room, Player, GameState, RoomSettings } from '../../../shared/types';
+import type { Room, GameState, Player } from '../../../shared/types';
 
-interface SocketState {
-  isConnected: boolean;
-  socketId: string | null;
-  error: string | null;
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+
+export interface V2GameState {
+  version: 'v2';
+  phase: 'playing' | 'finished';
+  currentPlayerId: string | null;
+  currentPlayerIndex: number;
+  direction: 1 | -1;
+  deckCount: number;
+  discardPile: any[];
+  topCard: any | null;
+  currentColor: string;
+  pendingDraw: number;
+  pendingDrawType?: string;
+  skippedPlayerId?: string;
+  players: V2PlayerInfo[];
+  rankings: any[] | null;
+  outState?: {
+    phase: number;
+    maxCards: number;
+    nextOutAt: number;
+  };
+  turnStartTime: number;
+  lastAction?: any;
 }
 
-interface UseSocketReturn extends SocketState {
-  socket: Socket | null;
-  createRoom: (nickname: string) => void;
-  joinRoom: (roomCode: string, nickname: string) => void;
-  leaveRoom: () => void;
-  addAI: (roomCode: string, difficulty: 'easy' | 'normal' | 'hard', aiType?: 'bot' | 'host') => void;
-  removeAI: (roomCode: string, aiId: string) => void;
-  startGame: (roomCode: string) => void;
-  playCard: (roomCode: string, cardId: string, chosenColor?: string) => void;
-  playCombo: (roomCode: string, comboType: 'pair' | 'three' | 'rainbow' | 'straight', cardIds: string[], targetId?: string) => void;
-  drawCard: (roomCode: string) => void;
-  callUno: (roomCode: string) => void;
-  challengeUno: (roomCode: string, targetId: string) => void;
-  jumpIn: (roomCode: string, cardId: string) => void;
-  updateSettings: (roomCode: string, settings: Partial<RoomSettings>) => void;
-  reconnect: (roomCode: string, playerId: string) => void;
-  sendMessage: (roomCode: string, type: 'emoji' | 'text', content: string) => void;
-  toggleHost: (roomCode: string, enabled: boolean) => void;
+export interface V2PlayerInfo {
+  id: string;
+  nickname: string;
+  cardCount: number;
+  status: 'ontable' | 'finished';
+  eliminated: boolean;
+  hasCalledUno: boolean;
+  isAI: boolean;
 }
 
-// V2 API 可用动作
+export interface AvailableAction {
+  type: 'play' | 'draw' | 'uno' | 'challenge' | 'skip';
+  cardId?: string;
+  requiresColor?: boolean;
+}
+
 export interface AvailableActionsV2 {
-  draw?: { enabled: boolean; reason?: string };
-  play?: { enabled: boolean; cards: Array<{ cardId: string; reason?: string }>; reason?: string };
-  combo?: { enabled: boolean; starters: Array<{ comboType: string; cardIds: string[] }>; reason?: string };
-  special?: { jumpIn?: { enabled: boolean; cardIds: string[] }; unoCall?: { enabled: boolean }; challengeUno?: { enabled: boolean; targetId?: string } };
+  canPlay: boolean;
+  playableCards: string[];
+  canDraw: boolean;
+  drawReason?: string;
+  canCallUno: boolean;
+  mustCallUno: boolean;
+  canChallenge: boolean;
+  challengeTargets?: string[];
+  canJumpIn: boolean;
+  jumpInCards?: string[];
 }
 
 export function useSocket(
-  serverUrl: string,
-  userId: string,
-  nickname: string,
+  serverUrl: string = SOCKET_URL,
+  userId?: string,
+  nickname?: string,
   onRoomCreated?: (room: Room) => void,
   onRoomJoined?: (room: Room) => void,
   onRoomUpdated?: (room: Room) => void,
-  onPlayerJoined?: (data: { playerId: string; nickname: string; isAI?: boolean }) => void,
-  onPlayerLeft?: (data: { playerId: string }) => void,
+  onPlayerJoined?: (player: Player) => void,
+  onPlayerLeft?: (playerId: string) => void,
   onGameStarted?: (gameState: GameState) => void,
   onGameState?: (gameState: GameState) => void,
-  onGameEnded?: (data: { winner: Player }) => void,
-  onReceiveMessage?: (msg: { type: string; content: string; playerId: string; playerName: string; timestamp: number }) => void,
+  onGameEnded?: (data: { winner: Player; rankings?: any[] }) => void,
+  onReceiveMessage?: (msg: any) => void,
   onError?: (error: { code: string; message: string }) => void,
   onAvailableActions?: (actions: AvailableActionsV2) => void
-): UseSocketReturn {
+) {
   const socketRef = useRef<Socket | null>(null);
-  const [state, setState] = useState<SocketState>({
-    isConnected: false,
-    socketId: null,
-    error: null
-  });
   
-  // 保存 userId 用于重连
-  const userIdRef = useRef(userId);
-  
-  // 使用 ref 保存回调，避免闭包问题
-  const callbacksRef = useRef({
-    onRoomCreated,
-    onRoomJoined,
-    onRoomUpdated,
-    onPlayerJoined,
-    onPlayerLeft,
-    onGameStarted,
-    onGameState,
-    onGameEnded,
-    onReceiveMessage,
-    onError,
-    onAvailableActions
-  });
-  
-  // 更新 ref 中的回调
-  useEffect(() => {
-    callbacksRef.current = {
-      onRoomCreated,
-      onRoomJoined,
-      onRoomUpdated,
-      onPlayerJoined,
-      onPlayerLeft,
-      onGameStarted,
-      onGameState,
-      onGameEnded,
-      onReceiveMessage,
-      onError,
-      onAvailableActions
-    };
-  }, [onRoomCreated, onRoomJoined, onRoomUpdated, onPlayerJoined, onPlayerLeft, onGameStarted, onGameState, onGameEnded, onReceiveMessage, onError, onAvailableActions]);
+  // 状态
+  const [isConnected, setIsConnected] = useState(false);
+  const [gameState, setGameState] = useState<V2GameState | null>(null);
+  const [myHand, setMyHand] = useState<any[]>([]);
+  const [availableActions, setAvailableActions] = useState<AvailableAction[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  // 初始化Socket连接
+  // 初始化连接
   useEffect(() => {
-    console.log('Connecting to server:', serverUrl);
     const socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      timeout: 10000
     });
 
     socketRef.current = socket;
 
+    // 连接事件
     socket.on('connect', () => {
-      console.log('Socket connected:', socket.id);
-      setState({
-        isConnected: true,
-        socketId: socket.id || null,
-        error: null
-      });
-      // 发送认证信息
-      socket.emit('auth', { userId: userIdRef.current, nickname });
+      console.log('[Socket] Connected');
+      setIsConnected(true);
+      setError(null);
+      
+      // 认证
+      const deviceId = localStorage.getItem('uno-device-id') || `guest_${Date.now()}`;
+      const savedName = localStorage.getItem('uno-nickname') || '玩家';
+      socket.emit('auth', { userId: userId || deviceId, nickname: nickname || savedName });
     });
 
-    socket.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason);
-      setState(prev => ({
-        ...prev,
-        isConnected: false
-      }));
+    socket.on('disconnect', () => {
+      console.log('[Socket] Disconnected');
+      setIsConnected(false);
     });
 
     socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err);
-      setState(prev => ({
-        ...prev,
-        error: '连接服务器失败'
-      }));
+      console.error('[Socket] Error:', err);
+      setError('连接失败');
+      onError?.({ code: 'CONNECT_ERROR', message: '连接服务器失败' });
     });
 
     // 房间事件
-    socket.on('room:create', (data) => {
-      if (data.success && callbacksRef.current.onRoomCreated) {
-        callbacksRef.current.onRoomCreated(data.room);
+    socket.on('room:created', (room: Room) => {
+      console.log('[Socket] Room created:', room.code);
+      onRoomCreated?.(room);
+    });
+
+    socket.on('room:joined', (data: { success: boolean; room: Room; userId: string }) => {
+      console.log('[Socket] Room joined:', data.room?.code);
+      if (data.success) {
+        onRoomJoined?.(data.room);
       }
     });
 
-    socket.on('room:join', (data) => {
-      if (data.success && callbacksRef.current.onRoomJoined) {
-        callbacksRef.current.onRoomJoined(data.room);
-      }
+    socket.on('room:updated', (room: Room) => {
+      onRoomUpdated?.(room);
     });
 
-    socket.on('room:updated', (room) => {
-      console.log('Room updated:', room.code, 'players:', room.players.length);
-      if (callbacksRef.current.onRoomUpdated) {
-        callbacksRef.current.onRoomUpdated(room);
-      }
+    socket.on('player:joined', (player: Player) => {
+      onPlayerJoined?.(player);
     });
 
-    socket.on('room:playerJoined', (data) => {
-      if (callbacksRef.current.onPlayerJoined) {
-        callbacksRef.current.onPlayerJoined(data);
-      }
-    });
-
-    socket.on('room:playerLeft', (data) => {
-      if (callbacksRef.current.onPlayerLeft) {
-        callbacksRef.current.onPlayerLeft(data);
-      }
+    socket.on('player:left', (data: { playerId: string }) => {
+      onPlayerLeft?.(data.playerId);
     });
 
     // 游戏事件
-    socket.on('game:start', (data) => {
-      if (data.success && callbacksRef.current.onGameStarted) {
-        callbacksRef.current.onGameStarted(data.gameState);
+    socket.on('game:started', (gameState: GameState) => {
+      console.log('[Socket] Game started');
+      onGameStarted?.(gameState);
+    });
+
+    socket.on('game:state', (gameState: GameState) => {
+      onGameState?.(gameState);
+    });
+
+    socket.on('game:ended', (data: { winner: Player; rankings?: any[] }) => {
+      onGameEnded?.(data);
+    });
+
+    // V2 游戏事件
+    socket.on('v2:gameState', (state: V2GameState) => {
+      setGameState(state);
+    });
+
+    socket.on('v2:playerHand', (data: { playerId: string; cards: any[] }) => {
+      const currentUserId = userId || localStorage.getItem('uno-device-id');
+      if (data.playerId === currentUserId) {
+        setMyHand(data.cards);
       }
     });
 
-    socket.on('game:state', (gameState) => {
-      if (callbacksRef.current.onGameState) {
-        callbacksRef.current.onGameState(gameState);
+    socket.on('v2:availableActions', (data: { playerId: string; actions: AvailableAction[] }) => {
+      const currentUserId = userId || localStorage.getItem('uno-device-id');
+      if (data.playerId === currentUserId) {
+        setAvailableActions(data.actions);
       }
     });
 
-    socket.on('game:ended', (data) => {
-      if (callbacksRef.current.onGameEnded) {
-        callbacksRef.current.onGameEnded(data);
-      }
+    socket.on('v2:actionFailed', (data: { action: any; reason: string }) => {
+      console.warn('[Socket] Action failed:', data);
+      onError?.({ code: 'ACTION_FAILED', message: data.reason });
     });
 
-    // 质疑结果
-    socket.on('game:challengeResult', (data) => {
-      if (callbacksRef.current.onError) {
-        callbacksRef.current.onError({ code: data.success ? 'CHALLENGE_SUCCESS' : 'CHALLENGE_FAILED', message: data.message });
-      }
+    socket.on('v2:gameEnded', (data: { winnerId: string; rankings: any[] }) => {
+      console.log('[Socket] Game ended:', data);
     });
 
-    // V2 API 可用动作
-    socket.on('game:availableActions', (data) => {
-      if (callbacksRef.current.onAvailableActions) {
-        callbacksRef.current.onAvailableActions(data.availableActions);
-      }
+    // 聊天事件
+    socket.on('chat:receive', (msg: any) => {
+      onReceiveMessage?.(msg);
     });
 
-    // 接收消息（表情/文字）
-    socket.on('chat:receive', (data) => {
-      if (callbacksRef.current.onReceiveMessage) {
-        callbacksRef.current.onReceiveMessage(data);
-      }
-    });
-
-    // 错误处理
-    socket.on('error', (error) => {
-      console.error('Socket error:', error);
-      if (callbacksRef.current.onError) {
-        callbacksRef.current.onError(error);
-      }
+    // 错误事件
+    socket.on('error', (data: { code: string; message: string }) => {
+      console.error('[Socket] Server error:', data);
+      onError?.(data);
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [serverUrl]);
+  }, [serverUrl, userId, nickname]);
 
-  // 房间操作
+  // ========== 房间操作 ==========
+
   const createRoom = useCallback((nickname: string) => {
-    socketRef.current?.emit('room:create', { nickname, userId: userIdRef.current });
-  }, []);
+    socketRef.current?.emit('CREATE_ROOM', { nickname, userId });
+  }, [userId]);
 
   const joinRoom = useCallback((roomCode: string, nickname: string) => {
-    socketRef.current?.emit('room:join', { roomCode, nickname, userId: userIdRef.current });
-  }, []);
+    socketRef.current?.emit('JOIN_ROOM', { roomCode, nickname, userId });
+  }, [userId]);
 
   const leaveRoom = useCallback(() => {
-    socketRef.current?.emit('room:leave');
+    socketRef.current?.emit('LEAVE_ROOM');
   }, []);
 
-  // AI管理
-  const addAI = useCallback((roomCode: string, difficulty: 'easy' | 'normal' | 'hard', aiType?: 'bot' | 'host') => {
-    socketRef.current?.emit('ai:add', { roomCode, difficulty, aiType });
+  const reconnect = useCallback((roomCode: string, userId: string) => {
+    socketRef.current?.emit('JOIN_ROOM', { roomCode, userId });
+  }, []);
+
+  const addAI = useCallback((roomCode: string, difficulty: string, type: string) => {
+    socketRef.current?.emit('ADD_AI', { roomCode, difficulty, type });
   }, []);
 
   const removeAI = useCallback((roomCode: string, aiId: string) => {
-    socketRef.current?.emit('ai:remove', { roomCode, aiId });
+    socketRef.current?.emit('REMOVE_AI', { roomCode, aiId });
   }, []);
 
-  // 游戏操作
+  const updateSettings = useCallback((roomCode: string, settings: any) => {
+    socketRef.current?.emit('UPDATE_SETTINGS', { roomCode, settings });
+  }, []);
+
+  // ========== 游戏操作 ==========
+
   const startGame = useCallback((roomCode: string) => {
-    socketRef.current?.emit('game:start', { roomCode });
+    socketRef.current?.emit('START_GAME', { roomCode });
+  }, []);
+
+  const startGameV2 = useCallback((roomCode: string, mode: 'standard' | 'out' = 'out') => {
+    socketRef.current?.emit('v2:gameStart', { roomCode, mode });
   }, []);
 
   const playCard = useCallback((roomCode: string, cardId: string, chosenColor?: string) => {
-    socketRef.current?.emit('game:playCard', { roomCode, cardId, chosenColor });
+    socketRef.current?.emit('PLAY_CARD', { roomCode, cardId, chosenColor });
   }, []);
 
-  const playCombo = useCallback((roomCode: string, comboType: 'pair' | 'three' | 'rainbow' | 'straight', cardIds: string[], targetId?: string) => {
-    socketRef.current?.emit('game:playCombo', { roomCode, comboType, cardIds, targetId });
+  const playCardV2 = useCallback((roomCode: string, cardId: string, chosenColor?: string) => {
+    socketRef.current?.emit('v2:playCard', { roomCode, cardId, chosenColor });
+  }, []);
+
+  const playCombo = useCallback((roomCode: string, comboType: string, cardIds: string[], targetId?: string) => {
+    socketRef.current?.emit('PLAY_COMBO', { roomCode, comboType, cardIds, targetId });
   }, []);
 
   const drawCard = useCallback((roomCode: string) => {
-    socketRef.current?.emit('game:drawCard', { roomCode });
+    socketRef.current?.emit('DRAW_CARD', { roomCode });
+  }, []);
+
+  const drawCardV2 = useCallback((roomCode: string) => {
+    socketRef.current?.emit('v2:draw', { roomCode });
   }, []);
 
   const callUno = useCallback((roomCode: string) => {
-    socketRef.current?.emit('game:callUno', { roomCode });
+    socketRef.current?.emit('CALL_UNO', { roomCode });
+  }, []);
+
+  const callUnoV2 = useCallback((roomCode: string) => {
+    socketRef.current?.emit('v2:callUno', { roomCode });
   }, []);
 
   const challengeUno = useCallback((roomCode: string, targetId: string) => {
-    socketRef.current?.emit('game:challengeUno', { roomCode, targetId });
+    socketRef.current?.emit('CHALLENGE_UNO', { roomCode, targetId });
   }, []);
 
   const jumpIn = useCallback((roomCode: string, cardId: string) => {
-    socketRef.current?.emit('game:jumpIn', { roomCode, cardId });
+    socketRef.current?.emit('JUMP_IN', { roomCode, cardId });
   }, []);
 
-  const updateSettings = useCallback((roomCode: string, settings: Partial<RoomSettings>) => {
-    socketRef.current?.emit('room:updateSettings', { roomCode, settings });
-  }, []);
-
-  const reconnect = useCallback((roomCode: string, _playerId: string) => {
-    // 使用固定的 userId 而不是 playerId
-    socketRef.current?.emit('player:reconnect', { roomCode, userId: userIdRef.current });
-  }, []);
-
-  const sendMessage = useCallback((roomCode: string, type: 'emoji' | 'text', content: string) => {
-    socketRef.current?.emit('chat:send', { roomCode, type, content });
+  const sendMessage = useCallback((roomCode: string, type: string, content: string) => {
+    socketRef.current?.emit('SEND_MESSAGE', { roomCode, type, content });
   }, []);
 
   const toggleHost = useCallback((roomCode: string, enabled: boolean) => {
-    socketRef.current?.emit('player:toggleHosting', { roomCode, enabled });
+    socketRef.current?.emit('TOGGLE_HOST', { roomCode, enabled });
   }, []);
 
   return {
+    // 连接状态
     socket: socketRef.current,
-    ...state,
+    isConnected,
+    error,
+    clearError: () => setError(null),
+
+    // 游戏状态 (V2)
+    gameState,
+    myHand,
+    availableActions,
+    isMyTurn: gameState?.currentPlayerId === (userId || localStorage.getItem('uno-device-id')),
+    myPlayerId: userId || localStorage.getItem('uno-device-id'),
+
+    // 房间操作
     createRoom,
     joinRoom,
     leaveRoom,
+    reconnect,
     addAI,
     removeAI,
+    updateSettings,
+
+    // 游戏操作
     startGame,
+    startGameV2,
     playCard,
+    playCardV2,
     playCombo,
     drawCard,
+    drawCardV2,
     callUno,
+    callUnoV2,
     challengeUno,
     jumpIn,
-    updateSettings,
-    reconnect,
     sendMessage,
-    toggleHost
+    toggleHost,
   };
 }
+
+export type { V2GameState, V2PlayerInfo, AvailableAction, AvailableActionsV2 };

@@ -1,5 +1,4 @@
 import { Player, GameState, GameAction } from '../../shared/index.js';
-import { GameModeFactory } from '../modes/GameMode.js';
 import { AIContext, AIDifficultyConfig, DEFAULT_DIFFICULTY_CONFIGS } from './types.js';
 import { EmojiType } from './emojis.js';
 import { BaseAIStrategy, AICapability } from './core/BaseAIStrategy.js';
@@ -8,7 +7,7 @@ import { NormalAIStrategy } from './strategies/NormalAIStrategy.js';
 import { HardAIStrategy } from './strategies/HardAIStrategy.js';
 
 /**
- * AI玩家主类
+ * AI玩家主类 - V2架构简化版
  */
 export class AIPlayer {
   private static strategyCache = new Map<string, BaseAIStrategy>();
@@ -24,9 +23,8 @@ export class AIPlayer {
   ): GameAction | null {
     if (!player.isAI || !player.aiDifficulty) return null;
     
-    const modeName = this.detectGameMode(gameState);
-    const mode = GameModeFactory.create(modeName);
-    const availableActions = mode.getAvailableActions(gameState, player.id);
+    // V2: 直接使用策略决策，不再依赖GameMode
+    const availableActions = this.calculateAvailableActions(player, gameState);
     
     const context: AIContext = {
       player,
@@ -40,13 +38,44 @@ export class AIPlayer {
   }
   
   /**
-   * 检测游戏模式
+   * V2: 计算可用动作（简化版，直接在AIPlayer中实现）
    */
-  private static detectGameMode(gameState: GameState): string {
-    if (gameState.outState || gameState.maxHandSize === 20) {
-      return 'out';
+  private static calculateAvailableActions(
+    player: Player,
+    gameState: GameState
+  ): GameAction[] {
+    const actions: GameAction[] = [];
+    
+    // 简化的可用动作计算
+    // 实际游戏中，这些应该由服务器推送或从v2:availableActions获取
+    
+    // 摸牌总是可用
+    actions.push({
+      type: 'draw',
+      playerId: player.id,
+      timestamp: Date.now()
+    });
+    
+    // 如果有手牌，添加出牌动作
+    for (const card of player.cards) {
+      actions.push({
+        type: 'play',
+        playerId: player.id,
+        cardIds: [card.id],
+        timestamp: Date.now()
+      });
     }
-    return 'standard';
+    
+    // UNO按钮（剩2张或更少时）
+    if (player.cards.length <= 2) {
+      actions.push({
+        type: 'uno',
+        playerId: player.id,
+        timestamp: Date.now()
+      });
+    }
+    
+    return actions;
   }
   
   /**

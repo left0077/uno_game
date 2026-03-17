@@ -3,7 +3,7 @@
  * 测试排名计算逻辑
  */
 
-import { calculateResult, GameStateV2 } from '../../../game/v2/types.js';
+import { calculateResult, GameStateV2 } from '../../../game/core/types.js';
 import { Player } from '../../../shared/index.js';
 import { expect, test, describe } from '../../test-runner.js';
 

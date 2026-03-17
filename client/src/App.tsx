@@ -1,9 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { io } from 'socket.io-client';
+
 import { Home } from './pages/Home';
 import { Room } from './pages/Room';
-import { Game } from './pages/Game';
-import GameV2 from './pages/GameV2';
+import Game from './pages/Game';
 import { SettingsModal } from './components/SettingsModal';
 import { useSocket, AvailableActionsV2 } from './hooks/useSocket';
 import { useGameStore } from './hooks/useGameStore';
@@ -11,7 +10,7 @@ import type { Room as RoomType, GameState, Player, RoomSettings, ChatMessage } f
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
-type Page = 'home' | 'room' | 'game' | 'gamev2';
+type Page = 'home' | 'room' | 'game';
 
 function App() {
   const store = useGameStore();
@@ -144,22 +143,7 @@ function App() {
 
   const [isReconnecting, setIsReconnecting] = useState(false);
   
-  const socket = useSocket(
-    store.serverUrl,
-    store.userId,
-    store.nickname,
-    handleRoomCreated,
-    handleRoomJoined,
-    handleRoomUpdated,
-    undefined,
-    undefined,
-    handleGameStarted,
-    handleGameState,
-    handleGameEnded,
-    handleReceiveMessage,
-    handleError,
-    handleAvailableActions
-  );
+  const socket = useSocket(store.serverUrl);
   
   // 断线重连处理
   const hasReconnectedRef = useRef(false);
@@ -258,25 +242,13 @@ function App() {
 
   const handleStartGame = useCallback(() => {
     if (store.currentRoom) {
-      socket.startGame(store.currentRoom.code);
-    }
-  }, [socket, store.currentRoom]);
-
-  const handleStartGameV2 = useCallback(() => {
-    if (store.currentRoom) {
       // 使用 V2 Socket API 开始游戏
-      const socketV2 = io(SOCKET_URL, { transports: ['websocket'] });
-      socketV2.emit('auth', { userId: store.userId, nickname: store.nickname });
-      socketV2.emit('v2:gameStart', { 
+      socket.socket?.emit('v2:gameStart', { 
         roomCode: store.currentRoom.code, 
         mode: 'out' 
       });
-      
-      // 保存房间代码并切换到 V2 游戏页面
-      localStorage.setItem('uno-current-room', JSON.stringify(store.currentRoom));
-      setPage('gamev2');
     }
-  }, [socket, store.currentRoom, store.userId, store.nickname]);
+  }, [socket, store.currentRoom]);
 
   const handleUpdateSettings = useCallback((settings: Partial<RoomSettings>) => {
     if (store.currentRoom) {
@@ -313,7 +285,7 @@ function App() {
   
   // 断线提示组件
   const ConnectionStatus = () => {
-    if (!socket.isConnected && (page === 'room' || page === 'game' || page === 'gamev2')) {
+    if (!socket.isConnected && (page === 'room' || page === 'game')) {
       return (
         <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500/90 text-yellow-900 px-4 py-2 text-center text-sm font-medium">
           {isReconnecting ? '正在重新连接...' : '连接已断开，正在尝试重连...'}
@@ -363,7 +335,6 @@ function App() {
       );
 
     case 'room': {
-      // 优先使用 store 中的房间，如果没有则从 localStorage 恢复
       const savedRoom = localStorage.getItem('uno-current-room');
       const room = store.currentRoom || (savedRoom ? JSON.parse(savedRoom) : null);
       
@@ -372,7 +343,6 @@ function App() {
         return null;
       }
       
-      // 同步更新 store（如果还没有设置）
       if (!store.currentRoom && savedRoom) {
         store.setCurrentRoom(JSON.parse(savedRoom));
       }
@@ -381,69 +351,25 @@ function App() {
         <>
           <ConnectionStatus />
           <Room
-          room={room}
-          currentPlayerId={currentPlayerId}
-          onLeaveRoom={handleLeaveRoom}
-          onAddAI={handleAddAI}
-          onRemoveAI={handleRemoveAI}
-          onKickPlayer={handleKickPlayer}
-          onStartGame={handleStartGame}
-          onStartGameV2={handleStartGameV2}
-          onUpdateSettings={handleUpdateSettings}
-          error={store.error}
-        />
+            room={room}
+            currentPlayerId={currentPlayerId}
+            onLeaveRoom={handleLeaveRoom}
+            onAddAI={handleAddAI}
+            onRemoveAI={handleRemoveAI}
+            onKickPlayer={handleKickPlayer}
+            onStartGame={handleStartGame}
+            onUpdateSettings={handleUpdateSettings}
+            error={store.error}
+          />
         </>
       );
     }
 
     case 'game':
-      if (!store.currentRoom || !store.gameState) {
-        setPage('room');
-        return null;
-      }
       return (
         <>
           <ConnectionStatus />
-          <Game
-          room={store.currentRoom}
-          gameState={store.gameState}
-          currentPlayerId={currentPlayerId}
-          availableActionsV2={availableActionsV2}
-          onPlayCard={(cardId, chosenColor) => {
-            if (store.currentRoom) {
-              socket.playCard(store.currentRoom.code, cardId, chosenColor);
-            }
-          }}
-          onPlayCombo={(comboType, cardIds, targetId) => {
-            if (store.currentRoom) {
-              socket.playCombo(store.currentRoom.code, comboType, cardIds, targetId);
-            }
-          }}
-          onDrawCard={() => {
-            if (store.currentRoom) {
-              socket.drawCard(store.currentRoom.code);
-            }
-          }}
-          onCallUno={() => {
-            if (store.currentRoom) {
-              socket.callUno(store.currentRoom.code);
-            }
-          }}
-          onChallengeUno={handleChallengeUno}
-          onJumpIn={handleJumpIn}
-          onLeaveGame={handleLeaveRoom}
-          onSendEmoji={handleSendEmoji}
-          onToggleHost={handleToggleHost}
-          chatMessages={chatMessages}
-        />
-        </>
-      );
-
-    case 'gamev2':
-      return (
-        <>
-          <ConnectionStatus />
-          <GameV2 />
+          <Game />
         </>
       );
 

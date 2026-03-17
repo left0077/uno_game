@@ -3,8 +3,8 @@
  * 测试预分配位置排名系统的核心逻辑
  */
 
-import { PlayerManager } from '../../../game/v2/PlayerManager.js';
-import { GameStateV2 } from '../../../game/v2/types.js';
+import { PlayerManager } from '../../../game/core/PlayerManager.js';
+import { GameStateV2 } from '../../../game/core/types.js';
 import { Player } from '../../../shared/index.js';
 import { expect, test, describe } from '../../test-runner.js';
 

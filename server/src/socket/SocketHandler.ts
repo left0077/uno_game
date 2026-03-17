@@ -1,597 +1,467 @@
+/**
+ * SocketHandlerV2 - V2 架构专用 Socket 处理器
+ * 
+ * 特点：
+ * 1. 直接使用 GameStateV2
+ * 2. 原生支持 action-based API
+ * 3. 简化的状态同步
+ */
+
 import { Server, Socket } from 'socket.io';
 import { RoomManager, roomManager } from '../rooms/RoomManager.js';
-import { UnoGame } from '../game/UnoGame.js';
 import { AIPlayer } from '../game/ai/index.js';
-import { SocketEvents, Player, Room, RoomSettings, UserSession } from '../shared/index.js';
+import { SocketEvents, Player, Room, RoomSettings } from '../shared/index.js';
 import { ACTION_API_VERSION } from '../shared/actionApi.js';
+import { GameStateV2, GameActionV2, calculateResult } from '../game/core/types.js';
+import { PlayerManager } from '../game/core/PlayerManager.js';
+import { GameInitializer } from '../game/core/GameInitializer.js';
+import { BaseGameModeV2 } from '../game/core/BaseGameModeV2.js';
+import { OutModeV2 } from '../game/core/OutModeV2.js';
 
-// 存储 socket 到 userId 的映射
+// V2 游戏实例
+interface V2GameInstance {
+  roomCode: string;
+  state: GameStateV2;
+  mode: BaseGameModeV2;
+  playerManager: PlayerManager;
+}
+
+// 存储 V2 游戏实例
+const v2Games = new Map<string, V2GameInstance>();
 const socketUserMap = new Map<string, string>();
-
-// 存储活跃的游戏实例
-const activeGames = new Map<string, UnoGame>();
 
 export function setupSocketHandlers(io: Server): void {
   io.on('connection', (socket: Socket) => {
-    console.log('Client connected:', socket.id);
-    
-    // ========== 房间事件 ==========
-    
-    // 用户认证/注册（连接时发送 userId）
+    console.log('[V2] Client connected:', socket.id);
+
+    // ========== 认证 ==========
     socket.on('auth', (data: { userId: string; nickname: string }) => {
       socketUserMap.set(socket.id, data.userId);
-      console.log(`Socket ${socket.id} authenticated as user ${data.userId}`);
+      console.log(`[V2] Socket ${socket.id} authenticated as ${data.userId}`);
     });
 
-    // 创建房间
+    // ========== 房间管理 ==========
+    
     socket.on(SocketEvents.CREATE_ROOM, (data: { nickname: string; userId?: string }) => {
       try {
-        // 优先使用传入的 userId，否则使用 socket id（兼容旧版本）
         const userId = data.userId || socketUserMap.get(socket.id) || socket.id;
         const room = roomManager.createRoom(userId, data.nickname);
         socket.join(room.code);
-        socket.emit(SocketEvents.CREATE_ROOM, { success: true, room, userId });
-        console.log(`Room created: ${room.code} by ${data.nickname} (${userId})`);
+        socket.emit('room:created', { success: true, room, userId });
+        console.log(`[V2] Room created: ${room.code}`);
       } catch (error) {
         socket.emit(SocketEvents.ERROR, { code: 'CREATE_ROOM_FAILED', message: '创建房间失败' });
       }
     });
-    
-    // 加入房间
+
     socket.on(SocketEvents.JOIN_ROOM, (data: { roomCode: string; nickname: string; userId?: string }) => {
       try {
-        // 优先使用传入的 userId，否则使用 socket id
         const userId = data.userId || socketUserMap.get(socket.id) || socket.id;
         const room = roomManager.joinRoom(data.roomCode, userId, data.nickname);
         if (!room) {
-          socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在或已满' });
+          socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
           return;
         }
         
         socket.join(data.roomCode);
-        // 广播完整的房间状态更新给所有玩家（包括新加入的玩家）
-        io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
-        socket.emit(SocketEvents.JOIN_ROOM, { success: true, room, userId });
-        console.log(`${data.nickname} joined room: ${data.roomCode} (${userId})`);
+        io.to(data.roomCode).emit('room:updated', room);
+        socket.emit('room:joined', { success: true, room, userId });
+        console.log(`[V2] ${data.nickname} joined room: ${data.roomCode}`);
       } catch (error) {
         socket.emit(SocketEvents.ERROR, { code: 'JOIN_ROOM_FAILED', message: '加入房间失败' });
       }
     });
-    
-    // 离开房间
+
     socket.on(SocketEvents.LEAVE_ROOM, () => {
       const userId = socketUserMap.get(socket.id) || socket.id;
       const room = roomManager.getPlayerRoom(userId);
       
       if (room) {
-        // 游戏进行中：转为托管而不是移除
-        if (room.status === 'playing') {
+        // 游戏进行中转为托管
+        if (room.status === 'playing' && v2Games.has(room.code)) {
           const player = room.players.find(p => p.id === userId);
           if (player) {
             player.isConnected = false;
-            player.disconnectedAt = Date.now();
             player.isAI = true;
             player.aiType = 'host';
-            player.aiDifficulty = 'normal';
-            
             io.to(room.code).emit(SocketEvents.ROOM_UPDATED, room);
-            console.log(`Player ${userId} left room ${room.code} (playing status), converted to AI host`);
           }
           socket.leave(room.code);
-          socketUserMap.delete(socket.id);
         } else {
-          // 等待状态：直接移除
+          // 等待状态直接移除
           const updatedRoom = roomManager.leaveRoom(userId);
           if (updatedRoom) {
             socket.leave(updatedRoom.code);
-            socket.to(updatedRoom.code).emit(SocketEvents.PLAYER_LEFT, { playerId: userId });
             io.to(updatedRoom.code).emit(SocketEvents.ROOM_UPDATED, updatedRoom);
-            socketUserMap.delete(socket.id);
-            // 清理AI策略缓存
-            AIPlayer.clearStrategyCache(userId);
           }
         }
       }
     });
+
+    // ========== V2 游戏开始 ==========
     
-    // 断开连接
-    socket.on('disconnect', () => {
-      const userId = socketUserMap.get(socket.id);
-      console.log('Client disconnected:', socket.id, 'userId:', userId);
-      
-      if (userId) {
-        const room = roomManager.getPlayerRoom(userId);
-        
-        if (room) {
-          if (room.status === 'waiting') {
-            // 等待状态：直接移除玩家，不需要重连
-            const updatedRoom = roomManager.leaveRoom(userId);
-            if (updatedRoom) {
-              // 先广播事件，再离开房间
-              io.to(room.code).emit(SocketEvents.ROOM_UPDATED, updatedRoom);
-              socket.to(room.code).emit(SocketEvents.PLAYER_LEFT, { playerId: userId });
-              socket.leave(room.code);
-              console.log(`Player ${userId} left room ${room.code} (waiting status), remaining players: ${updatedRoom.players.length}`);
-            }
-          } else {
-            // 游戏进行中：标记断开连接，支持重连
-            const updatedRoom = roomManager.markPlayerDisconnected(userId);
-            if (updatedRoom) {
-              io.to(room.code).emit(SocketEvents.ROOM_UPDATED, updatedRoom);
-              console.log(`Player ${userId} disconnected from room ${room.code} (playing status, can reconnect)`);
-            }
-          }
-        }
-        
-        socketUserMap.delete(socket.id);
-      }
-    });
-    
-    // 重新连接（断线重连）- 使用固定的 userId
-    socket.on('player:reconnect', (data: { roomCode: string; userId: string }) => {
-      const room = roomManager.getRoom(data.roomCode);
-      if (!room) {
-        // 重连失败不显示错误（可能是正常的新建房间流程）
-        socket.emit('player:reconnectFailed', { reason: 'ROOM_NOT_FOUND' });
-        return;
-      }
-      
-      // 查找断开的玩家（使用固定的 userId）
-      const player = room.players.find(p => p.id === data.userId && !p.isConnected);
-      if (!player) {
-        // 重连失败不显示错误（玩家可能已经在正常游戏中）
-        socket.emit('player:reconnectFailed', { reason: 'PLAYER_NOT_FOUND' });
-        return;
-      }
-      
-      // 更新 socket-user 映射
-      socketUserMap.set(socket.id, data.userId);
-      
-      // 更新玩家状态（id 保持不变，只更新连接状态）
-      player.isConnected = true;
-      player.disconnectedAt = undefined;
-      
-      // 清除托管状态（恢复为真人玩家）
-      player.isAI = false;
-      player.aiType = undefined;
-      player.aiDifficulty = undefined;
-      
-      // 同步更新 gameState 中的玩家状态
-      if (room.gameState) {
-        const gameStatePlayer = room.gameState.players.find(p => p.id === data.userId);
-        if (gameStatePlayer) {
-          gameStatePlayer.isConnected = true;
-          gameStatePlayer.disconnectedAt = undefined;
-          gameStatePlayer.isAI = false;
-          gameStatePlayer.aiType = undefined;
-          gameStatePlayer.aiDifficulty = undefined;
-        }
-      }
-      
-      // 加入房间
-      socket.join(data.roomCode);
-      
-      // 返回房间和游戏状态
-      socket.emit('player:reconnected', {
-        success: true,
-        room,
-        gameState: room.gameState,
-        userId: data.userId
-      });
-      
-      // 广播玩家重连（通知其他玩家）
-      io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
-      console.log(`Player ${data.userId} reconnected to room ${data.roomCode}`);
-    });
-    
-    // ========== AI管理 ==========
-    
-    // 添加AI
-    socket.on(SocketEvents.ADD_AI, (data: { roomCode: string; difficulty: 'easy' | 'normal' | 'hard'; aiType?: 'bot' | 'host' }) => {
+    socket.on('v2:gameStart', (data: { roomCode: string; mode: 'standard' | 'out' }) => {
       const room = roomManager.getRoom(data.roomCode);
       const userId = socketUserMap.get(socket.id) || socket.id;
-      if (!room || room.hostId !== userId) {
-        socket.emit(SocketEvents.ERROR, { code: 'PERMISSION_DENIED', message: '只有房主可以添加AI' });
-        return;
-      }
       
-      const aiPlayer = roomManager.addAI(data.roomCode, data.difficulty, data.aiType || 'bot');
-      if (aiPlayer) {
-        io.to(data.roomCode).emit(SocketEvents.PLAYER_JOINED, {
-          playerId: aiPlayer.id,
-          nickname: aiPlayer.nickname,
-          isAI: true,
-          aiType: aiPlayer.aiType
-        });
-        io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
-      }
-    });
-    
-    // 移除AI
-    socket.on(SocketEvents.REMOVE_AI, (data: { roomCode: string; aiId: string }) => {
-      const room = roomManager.getRoom(data.roomCode);
-      const userId = socketUserMap.get(socket.id) || socket.id;
-      if (!room || room.hostId !== userId) {
-        socket.emit(SocketEvents.ERROR, { code: 'PERMISSION_DENIED', message: '只有房主可以移除AI' });
-        return;
-      }
-      
-      if (roomManager.removeAI(data.roomCode, data.aiId)) {
-        io.to(data.roomCode).emit(SocketEvents.PLAYER_LEFT, { playerId: data.aiId });
-        io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
-      }
-    });
-    
-    // 更新房间设置
-    socket.on('room:updateSettings', (data: { roomCode: string; settings: Partial<RoomSettings> }) => {
-      const room = roomManager.getRoom(data.roomCode);
-      const userId = socketUserMap.get(socket.id) || socket.id;
-      if (!room || room.hostId !== userId) {
-        socket.emit(SocketEvents.ERROR, { code: 'PERMISSION_DENIED', message: '只有房主可以修改设置' });
-        return;
-      }
-      
-      if (room.status !== 'waiting') {
-        socket.emit(SocketEvents.ERROR, { code: 'GAME_ALREADY_STARTED', message: '游戏已开始，无法修改设置' });
-        return;
-      }
-      
-      if (roomManager.updateSettings(data.roomCode, userId, data.settings)) {
-        io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
-        console.log(`Room ${data.roomCode} settings updated:`, data.settings);
-      }
-    });
-    
-    // ========== 游戏事件 ==========
-    
-    // 开始游戏
-    socket.on(SocketEvents.GAME_START, (data: { roomCode: string }) => {
-      const room = roomManager.getRoom(data.roomCode);
-      const userId = socketUserMap.get(socket.id) || socket.id;
       if (!room || room.hostId !== userId) {
         socket.emit(SocketEvents.ERROR, { code: 'PERMISSION_DENIED', message: '只有房主可以开始游戏' });
         return;
       }
       
       if (room.players.length < 2) {
-        socket.emit(SocketEvents.ERROR, { code: 'NOT_ENOUGH_PLAYERS', message: '至少需要2人才能开始游戏' });
+        socket.emit(SocketEvents.ERROR, { code: 'NOT_ENOUGH_PLAYERS', message: '至少需要2人' });
         return;
       }
-      
-      if (room.status !== 'waiting') {
-        socket.emit(SocketEvents.ERROR, { code: 'GAME_ALREADY_STARTED', message: '游戏已经开始' });
-        return;
-      }
-      
-      // 创建游戏实例
-      const game = new UnoGame(room, {
-        onStateChange: (state) => {
-          // 发送游戏状态，包含 actionApiVersion
-          io.to(data.roomCode).emit(SocketEvents.GAME_STATE, {
-            ...state,
-            actionApiVersion: ACTION_API_VERSION
-          });
-          
-          // 为当前回合玩家发送可用动作
-          const currentPlayerId = state.currentPlayerId;
-          if (currentPlayerId) {
-            try {
-              const availableActions = game.getAvailableActionsV2(currentPlayerId);
-              
-              // 找到当前回合玩家的socket并发送
-              const roomSockets = io.sockets.adapter.rooms.get(data.roomCode);
-              if (roomSockets) {
-                for (const socketId of roomSockets) {
-                  const socket = io.sockets.sockets.get(socketId);
-                  const socketUserId = socketUserMap.get(socketId);
-                  if (socket && socketUserId === currentPlayerId) {
-                    socket.emit('game:availableActions', { 
-                      playerId: currentPlayerId,
-                      availableActions 
-                    });
-                    break;
-                  }
-                }
-              }
-            } catch (error) {
-              console.error(`[SocketHandler] 发送可用动作失败: playerId=${currentPlayerId}`, error);
-            }
-          }
-        },
-        onGameEnd: (winner) => {
-          // 游戏结束处理
-          const rankings = room.gameState?.rankings || [winner.id];
-          const rankedPlayers = rankings.map((playerId, index) => {
-            const player = room.players.find(p => p.id === playerId);
-            return {
-              rank: index + 1,
-              playerId,
-              nickname: player?.nickname || '未知玩家'
-            };
-          });
-          
-          io.to(data.roomCode).emit('game:ended', { winner, rankings: rankedPlayers });
-          activeGames.delete(data.roomCode);
-          
-          // 重置房间状态
-          room.status = 'waiting';
-          room.gameState = undefined;
-          room.players.forEach(p => {
-            p.cards = [];
-            p.cardCount = 0;
-            p.hasCalledUno = false;
-          });
-          io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
-          console.log(`Game ended in room: ${data.roomCode}, reset to waiting`);
-        },
-        onSendMessage: (playerId, type, content) => {
-          const player = room.players.find(p => p.id === playerId);
-          if (player) {
-            io.to(data.roomCode).emit(SocketEvents.RECEIVE_MESSAGE, {
-              type,
-              content,
-              playerId,
-              playerName: player.nickname,
-              timestamp: Date.now()
-            });
-          }
+
+      try {
+        // 创建 V2 游戏实例
+        const state = GameInitializer.createFromRoom(room, {
+          cardsPerPlayer: 7,
+          turnTimer: 120,
+          allowStacking: true,
+          allowJumpIn: true
+        });
+
+        // 创建模式
+        const mode = data.mode === 'out' ? new OutModeV2() : null;
+        if (!mode) {
+          socket.emit(SocketEvents.ERROR, { code: 'MODE_NOT_SUPPORTED', message: '该模式尚未支持' });
+          return;
         }
-      });
-      
-      activeGames.set(data.roomCode, game);
-      
-      // 发送游戏开始事件，包含 actionApiVersion
-      const gameState = game.getGameState();
-      io.to(data.roomCode).emit(SocketEvents.GAME_START, { 
-        success: true, 
-        gameState,
-        actionApiVersion: ACTION_API_VERSION
-      });
-      
-      // 为每个玩家发送其可用的动作
-      for (const player of room.players) {
-        if (!player.eliminated) {
-          try {
-            const availableActions = game.getAvailableActionsV2(player.id);
-            // 只发送给该玩家（通过socket id）
-            const playerSocket = Array.from(io.sockets.adapter.rooms.get(data.roomCode) || [])
-              .map(socketId => io.sockets.sockets.get(socketId))
-              .find(socket => {
-                const socketUserId = socketUserMap.get(socket?.id || '');
-                return socketUserId === player.id;
-              });
-            
-            if (playerSocket) {
-              playerSocket.emit('game:availableActions', { 
-                playerId: player.id,
-                availableActions 
-              });
-            }
-          } catch (error) {
-            console.error(`[SocketHandler] 发送可用动作失败: playerId=${player.id}`, error);
-          }
-        }
+
+        mode.initialize(state);
+        
+        const gameInstance: V2GameInstance = {
+          roomCode: data.roomCode,
+          state,
+          mode,
+          playerManager: new PlayerManager(state)
+        };
+        
+        v2Games.set(data.roomCode, gameInstance);
+        room.status = 'playing';
+        
+        // 发送初始状态
+        broadcastGameStateV2(io, data.roomCode, gameInstance);
+        
+        console.log(`[V2] Game started in room: ${data.roomCode}, mode: ${data.mode}`);
+      } catch (error) {
+        console.error('[V2] Game start failed:', error);
+        socket.emit(SocketEvents.ERROR, { code: 'GAME_START_FAILED', message: '游戏启动失败' });
       }
-      
-      console.log(`Game started in room: ${data.roomCode} with Action API v${ACTION_API_VERSION}`);
     });
+
+    // ========== V2 动作处理 ==========
     
-    // 出牌
-    socket.on(SocketEvents.PLAY_CARD, (data: { roomCode: string; cardId: string; chosenColor?: string }) => {
-      const game = activeGames.get(data.roomCode);
+    socket.on('v2:action', (data: { 
+      roomCode: string; 
+      action: Omit<GameActionV2, 'timestamp'>;
+    }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
+      const game = v2Games.get(data.roomCode);
+      
       if (!game) {
         socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
         return;
       }
-      
-      const action = {
-        type: 'play' as const,
-        playerId: userId,
-        cardIds: [data.cardId],
-        color: data.chosenColor,
-        timestamp: Date.now()
-      };
-      const success = game.handleAction(action, userId);
-      if (!success) {
-        socket.emit(SocketEvents.ERROR, { code: 'INVALID_PLAY', message: '无效的出牌' });
-      }
-    });
-    
-    // 摸牌
-    socket.on(SocketEvents.DRAW_CARD, (data: { roomCode: string }) => {
-      const game = activeGames.get(data.roomCode);
-      const userId = socketUserMap.get(socket.id) || socket.id;
-      if (!game) {
-        socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
+
+      // 验证玩家权限
+      if (data.action.playerId !== userId) {
+        socket.emit(SocketEvents.ERROR, { code: 'PERMISSION_DENIED', message: '只能执行自己的动作' });
         return;
       }
-      
-      const action = {
-        type: 'draw' as const,
-        playerId: userId,
+
+      // 执行动作
+      const action: GameActionV2 = {
+        ...data.action,
         timestamp: Date.now()
       };
-      game.handleAction(action, userId);
-    });
-    
-    // 喊UNO
-    socket.on(SocketEvents.CALL_UNO, (data: { roomCode: string }) => {
-      const game = activeGames.get(data.roomCode);
-      const userId = socketUserMap.get(socket.id) || socket.id;
-      if (!game) return;
+
+      const success = game.mode.handleAction(action);
       
-      const action = {
-        type: 'uno' as const,
-        playerId: userId,
-        timestamp: Date.now()
-      };
-      const success = game.handleAction(action, userId);
       if (success) {
-        io.to(data.roomCode).emit('game:unoCalled', { playerId: userId });
-      }
-    });
-    
-    // 质疑UNO
-    socket.on('game:challengeUno', (data: { roomCode: string; targetId: string }) => {
-      const game = activeGames.get(data.roomCode);
-      const userId = socketUserMap.get(socket.id) || socket.id;
-      if (!game) {
-        socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
-        return;
-      }
-      
-      const action = {
-        type: 'challenge' as const,
-        playerId: userId,
-        targetId: data.targetId,
-        timestamp: Date.now()
-      };
-      const success = game.handleAction(action, userId);
-      // 广播结果给所有玩家
-      io.to(data.roomCode).emit('game:challengeResult', { 
-        success,
-        challengerId: userId, 
-        targetId: data.targetId
-      });
-    });
-    
-    // 抢牌出（Jump-in）
-    socket.on(SocketEvents.JUMP_IN, (data: { roomCode: string; cardId: string }) => {
-      const game = activeGames.get(data.roomCode);
-      const userId = socketUserMap.get(socket.id) || socket.id;
-      if (!game) {
-        socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
-        return;
-      }
-      
-      const action = {
-        type: 'jumpIn' as const,
-        playerId: userId,
-        cardIds: [data.cardId],
-        timestamp: Date.now()
-      };
-      const success = game.handleAction(action, userId);
-      if (!success) {
-        socket.emit(SocketEvents.ERROR, { code: 'INVALID_JUMP_IN', message: '无法抢牌出' });
+        // 广播新状态
+        broadcastGameStateV2(io, data.roomCode, game);
+        
+        // 检查游戏结束
+        if (game.state.phase === 'finished') {
+          handleGameEndV2(io, data.roomCode, game);
+        }
       } else {
-        // 广播抢牌出成功
-        io.to(data.roomCode).emit('game:jumpInSuccess', { playerId: userId, cardId: data.cardId });
-      }
-    });
-    
-    // 连打出牌（Combo）- Out模式特有
-    socket.on('game:playCombo', (data: { roomCode: string; comboType: 'pair' | 'three' | 'rainbow' | 'straight'; cardIds: string[]; targetId?: string }) => {
-      const game = activeGames.get(data.roomCode);
-      const userId = socketUserMap.get(socket.id) || socket.id;
-      if (!game) {
-        socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
-        return;
-      }
-      
-      const action = {
-        type: 'combo' as const,
-        playerId: userId,
-        comboType: data.comboType,
-        cardIds: data.cardIds,
-        targetId: data.targetId,
-        timestamp: Date.now()
-      };
-      const success = game.handleAction(action, userId);
-      if (!success) {
-        socket.emit(SocketEvents.ERROR, { code: 'INVALID_COMBO', message: '无法执行连打' });
-      } else {
-        // 广播连打出牌成功
-        io.to(data.roomCode).emit('game:comboSuccess', { 
-          playerId: userId, 
-          comboType: data.comboType,
-          cardIds: data.cardIds,
-          targetId: data.targetId
+        socket.emit('v2:actionFailed', { 
+          action: data.action,
+          reason: 'INVALID_ACTION'
         });
       }
     });
+
+    // ========== 快捷动作 ==========
     
-    // 发送聊天消息（emoji/文字）
-    socket.on(SocketEvents.SEND_MESSAGE, (data: { roomCode: string; type: 'emoji' | 'text'; content: string }) => {
-      const room = roomManager.getRoom(data.roomCode);
+    socket.on('v2:playCard', (data: { roomCode: string; cardId: string; chosenColor?: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      if (!room) {
-        socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
-        return;
-      }
-      
-      const player = room.players.find(p => p.id === userId);
-      if (!player) {
-        socket.emit(SocketEvents.ERROR, { code: 'PLAYER_NOT_FOUND', message: '玩家不在房间中' });
-        return;
-      }
-      
-      // 广播消息给房间所有玩家
-      io.to(data.roomCode).emit(SocketEvents.RECEIVE_MESSAGE, {
-        type: data.type,
-        content: data.content,
-        playerId: userId,
-        playerName: player.nickname,
-        timestamp: Date.now()
+      socket.emit('v2:action', {
+        roomCode: data.roomCode,
+        action: {
+          type: 'play',
+          playerId: userId,
+          cardIds: [data.cardId],
+          chosenColor: data.chosenColor as any
+        }
       });
     });
-    
-    // 切换托管模式
-    socket.on(SocketEvents.TOGGLE_HOSTING, (data: { roomCode: string; enabled: boolean }) => {
-      const room = roomManager.getRoom(data.roomCode);
+
+    socket.on('v2:playCombo', (data: { 
+      roomCode: string; 
+      cardIds: string[]; 
+      comboType: string;
+      chosenColor?: string;
+    }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      if (!room) {
-        socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
-        return;
-      }
-      
-      const player = room.players.find(p => p.id === userId);
-      if (!player) {
-        socket.emit(SocketEvents.ERROR, { code: 'PLAYER_NOT_FOUND', message: '玩家不在房间中' });
-        return;
-      }
-      
-      // 切换托管状态 - 同时更新 room 和 gameState 中的玩家
-      player.isAI = data.enabled;
-      player.aiType = data.enabled ? 'host' : undefined;
-      player.aiDifficulty = data.enabled ? 'normal' : undefined; // 托管模式使用normal难度
-      
-      // 重要：同时更新 gameState 中的玩家状态
-      if (room.gameState) {
-        const gameStatePlayer = room.gameState.players.find(p => p.id === userId);
-        if (gameStatePlayer) {
-          gameStatePlayer.isAI = data.enabled;
-          gameStatePlayer.aiType = data.enabled ? 'host' : undefined;
-          gameStatePlayer.aiDifficulty = data.enabled ? 'normal' : undefined;
+      socket.emit('v2:action', {
+        roomCode: data.roomCode,
+        action: {
+          type: 'combo',
+          playerId: userId,
+          cardIds: data.cardIds,
+          comboType: data.comboType as any,
+          chosenColor: data.chosenColor as any
         }
-      }
-      
-      console.log(`[Hosting] 玩家 ${player.nickname} ${data.enabled ? '开启' : '关闭'}托管模式`);
-      
-      // 通知所有玩家状态更新
-      io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
-      
-      // 如果游戏进行中，也发送游戏状态更新
-      if (room.gameState) {
-        io.to(data.roomCode).emit(SocketEvents.GAME_STATE, room.gameState);
-      }
-      
-      // 通知当前玩家
-      socket.emit(SocketEvents.ERROR, { 
-        code: 'HOSTING_TOGGLED', 
-        message: data.enabled ? '已开启托管模式，AI将自动帮你出牌' : '已关闭托管模式' 
       });
+    });
+
+    socket.on('v2:draw', (data: { roomCode: string }) => {
+      const userId = socketUserMap.get(socket.id) || socket.id;
+      socket.emit('v2:action', {
+        roomCode: data.roomCode,
+        action: {
+          type: 'draw',
+          playerId: userId
+        }
+      });
+    });
+
+    socket.on('v2:callUno', (data: { roomCode: string }) => {
+      const userId = socketUserMap.get(socket.id) || socket.id;
+      socket.emit('v2:action', {
+        roomCode: data.roomCode,
+        action: {
+          type: 'uno',
+          playerId: userId
+        }
+      });
+    });
+
+    socket.on('v2:challenge', (data: { roomCode: string; targetId: string }) => {
+      const userId = socketUserMap.get(socket.id) || socket.id;
+      socket.emit('v2:action', {
+        roomCode: data.roomCode,
+        action: {
+          type: 'challenge',
+          playerId: userId,
+          targetId: data.targetId
+        }
+      });
+    });
+
+    // ========== 查询接口 ==========
+    
+    socket.on('v2:getState', (data: { roomCode: string }) => {
+      const game = v2Games.get(data.roomCode);
+      if (game) {
+        socket.emit('v2:gameState', serializeGameStateV2(game));
+      }
+    });
+
+    socket.on('v2:getAvailableActions', (data: { roomCode: string }) => {
+      const userId = socketUserMap.get(socket.id) || socket.id;
+      const game = v2Games.get(data.roomCode);
       
-      // 如果当前是托管玩家的回合，触发AI出牌
-      if (data.enabled && room.gameState?.currentPlayerId === userId) {
-        const game = activeGames.get(data.roomCode);
-        if (game) {
-          console.log(`[Hosting] 当前是托管玩家回合，触发AI出牌`);
-          setTimeout(() => {
-            game.checkAndHandleAITurn();
-          }, 500);
+      if (!game) return;
+      
+      const actions = calculateAvailableActionsV2(game, userId);
+      socket.emit('v2:availableActions', { playerId: userId, actions });
+    });
+
+    // ========== 断开连接 ==========
+    
+    socket.on('disconnect', () => {
+      const userId = socketUserMap.get(socket.id);
+      console.log('[V2] Client disconnected:', socket.id, userId);
+      
+      if (userId) {
+        const room = roomManager.getPlayerRoom(userId);
+        if (room && v2Games.has(room.code)) {
+          // 游戏进行中，转为托管
+          const player = room.players.find(p => p.id === userId);
+          if (player) {
+            player.isConnected = false;
+            player.isAI = true;
+            io.to(room.code).emit(SocketEvents.ROOM_UPDATED, room);
+          }
         }
       }
+      
+      socketUserMap.delete(socket.id);
     });
   });
+}
+
+// ============================================================================
+// 辅助函数
+// ============================================================================
+
+/**
+ * 广播游戏状态给房间所有玩家
+ */
+function broadcastGameStateV2(io: Server, roomCode: string, game: V2GameInstance): void {
+  const state = serializeGameStateV2(game);
+  io.to(roomCode).emit('v2:gameState', state);
+  
+  // 为每个玩家单独发送其手牌
+  for (const playerId of game.state.tablePlayerIds) {
+    const player = game.state.players.get(playerId);
+    if (player) {
+      // 找到玩家的 socket
+      const roomSockets = io.sockets.adapter.rooms.get(roomCode);
+      if (roomSockets) {
+        for (const socketId of roomSockets) {
+          const socket = io.sockets.sockets.get(socketId);
+          if (socket && socketUserMap.get(socketId) === playerId) {
+            socket.emit('v2:playerHand', {
+              playerId,
+              cards: player.cards,
+              cardCount: player.cards.length
+            });
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * 序列化 V2 游戏状态为前端格式
+ */
+function serializeGameStateV2(game: V2GameInstance): any {
+  const state = game.state;
+  const pm = game.playerManager;
+  
+  return {
+    version: 'v2',
+    phase: state.phase,
+    currentPlayerId: pm.getCurrentPlayerId(),
+    currentPlayerIndex: state.currentPlayerIndex,
+    direction: state.direction,
+    
+    // 牌堆
+    deckCount: state.deck.length,
+    discardPile: state.discardPile,
+    topCard: state.discardPile[state.discardPile.length - 1] || null,
+    currentColor: state.currentColor,
+    
+    // 惩罚状态
+    pendingDraw: state.pendingDraw || 0,
+    pendingDrawType: state.pendingDrawType,
+    skippedPlayerId: state.skippedPlayerId,
+    
+    // 玩家列表（不包含手牌，手牌单独发送）
+    players: pm.getAllPlayersInOrder().map(p => ({
+      id: p.id,
+      nickname: p.nickname,
+      cardCount: p.cards.length,
+      status: pm.isOnTable(p.id) ? 'ontable' : 'finished',
+      eliminated: p.eliminated,
+      hasCalledUno: p.hasCalledUno,
+      isAI: p.isAI
+    })),
+    
+    // 排名（游戏结束时）
+    rankings: state.phase === 'finished' 
+      ? calculateResult(state).rankings
+      : null,
+    
+    // Out模式特有
+    outState: state.outState,
+    
+    // 元数据
+    turnStartTime: state.turnStartTime,
+    lastAction: state.lastAction
+  };
+}
+
+/**
+ * 计算玩家可用动作
+ */
+function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): any[] {
+  const actions: any[] = [];
+  const player = game.state.players.get(playerId);
+  
+  if (!player || !game.playerManager.isOnTable(playerId)) {
+    return actions;
+  }
+  
+  const isCurrentTurn = game.playerManager.getCurrentPlayerId() === playerId;
+  
+  if (isCurrentTurn) {
+    // 可出的牌
+    const topCard = game.state.discardPile[game.state.discardPile.length - 1];
+    
+    for (const card of player.cards) {
+      let canPlay = false;
+      
+      // 有累积惩罚时只能叠加
+      if (game.state.pendingDraw && game.state.pendingDraw > 0) {
+        canPlay = card.type === game.state.pendingDrawType;
+      } else {
+        // 万能牌
+        if (card.type === 'wild' || card.type === 'draw4') canPlay = true;
+        // 颜色匹配
+        else if (card.color === game.state.currentColor) canPlay = true;
+        // 数值匹配
+        else if (topCard && card.value === topCard.value) canPlay = true;
+      }
+      
+      if (canPlay) {
+        actions.push({
+          type: 'play',
+          cardId: card.id,
+          requiresColor: card.type === 'wild' || card.type === 'draw4'
+        });
+      }
+    }
+    
+    // 摸牌
+    actions.push({ type: 'draw' });
+    
+    // 喊UNO
+    if (player.cards.length <= 2) {
+      actions.push({ type: 'uno' });
+    }
+  }
+  
+  return actions;
+}
+
+/**
+ * 处理游戏结束
+ */
+function handleGameEndV2(io: Server, roomCode: string, game: V2GameInstance): void {
+  const result = calculateResult(game.state);
+  const room = roomManager.getRoom(roomCode);
+  
+  if (room) {
+    room.status = 'waiting';
+    room.gameState = undefined;
+  }
+  
+  io.to(roomCode).emit('v2:gameEnded', {
+    winnerId: result.winnerId,
+    rankings: result.rankings
+  });
+  
+  v2Games.delete(roomCode);
+  
+  console.log(`[V2] Game ended in room: ${roomCode}`);
 }

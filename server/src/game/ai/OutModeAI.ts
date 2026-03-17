@@ -7,7 +7,7 @@ import {
   ComboOption,
   AIDifficultyConfig 
 } from './AIStrategy.js';
-import { ComboType } from '../modes/GameMode.js';
+import { ComboType } from '../../shared/index.js';
 
 /**
  * Out模式AI策略实现

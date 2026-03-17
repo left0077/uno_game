@@ -1,5 +1,5 @@
 import { Player, GameState, Card, GameAction } from '../../shared/index.js';
-import { ComboType } from '../modes/GameMode.js';
+import { ComboType } from '../../shared/index.js';
 
 /**
  * AI决策上下文

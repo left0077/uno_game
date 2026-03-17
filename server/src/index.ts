@@ -4,7 +4,6 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { setupSocketHandlers } from './socket/SocketHandler.js';
-import { setupSocketHandlersV2 } from './socket/SocketHandlerV2.js';
 import { roomManager } from './rooms/RoomManager.js';
 
 dotenv.config();
@@ -69,10 +68,9 @@ app.get('/api/room/:code', (req: Request, res: Response) => {
   res.json(room);
 });
 
-// 设置Socket事件处理器（旧版 + V2新版并行）
+// 设置Socket事件处理器（V2架构）
 setupSocketHandlers(io);
-setupSocketHandlersV2(io);
-console.log('📡 Socket handlers registered (v1 + v2)' );
+console.log('📡 Socket handlers registered (v2)' );
 
 // 定期清理过期房间（每5分钟）
 setInterval(() => {

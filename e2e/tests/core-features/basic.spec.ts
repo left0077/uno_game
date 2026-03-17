@@ -7,6 +7,14 @@ import { test, expect } from '@playwright/test';
 
 test.describe('基础功能测试', () => {
   
+  test.beforeEach(async ({ page }) => {
+    // 重置服务器URL为本地服务器
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.setItem('uno-server-url', 'http://localhost:3001');
+    });
+  });
+  
   test('首页加载正常', async ({ page }) => {
     await page.goto('/', { timeout: 30000 });
     
@@ -47,11 +55,9 @@ test.describe('基础功能测试', () => {
     await page.goto('/', { timeout: 30000 });
     await page.waitForLoadState('networkidle');
     
-    // 等待连接完成（按钮变为可用）
-    await page.waitForFunction(() => {
-      const btn = document.querySelector('button');
-      return btn && !btn.disabled;
-    }, { timeout: 10000 });
+    // 等待连接完成（创建房间按钮变为可用）
+    const createRoomBtn = page.getByRole('button', { name: /创建房间/i });
+    await expect(createRoomBtn).toBeEnabled({ timeout: 15000 });
     
     // 输入昵称
     await page.getByPlaceholder(/昵称/i).first().fill('房主');
