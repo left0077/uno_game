@@ -143,7 +143,22 @@ function App() {
 
   const [isReconnecting, setIsReconnecting] = useState(false);
   
-  const socket = useSocket(store.serverUrl);
+  const socket = useSocket(
+    store.serverUrl,
+    store.userId,
+    store.nickname,
+    handleRoomCreated,
+    handleRoomJoined,
+    handleRoomUpdated,
+    undefined,
+    undefined,
+    handleGameStarted,
+    handleGameState,
+    handleGameEnded,
+    undefined,
+    undefined,
+    undefined
+  );
   
   // 断线重连处理
   const hasReconnectedRef = useRef(false);
