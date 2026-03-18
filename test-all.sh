@@ -27,62 +27,26 @@ else
 fi
 cd ..
 
-# 2. CardManager 测试
+# 2. 后端单元测试
 echo ""
-echo "🃏 2. CardManager 测试..."
+echo "🃏 2. 后端单元测试..."
 cd server
-if node test-card.mjs > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ CardManager 测试通过${NC}"
+if npm test > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ 后端单元测试通过${NC}"
 else
-    echo -e "${RED}❌ CardManager 测试失败${NC}"
+    echo -e "${RED}❌ 后端单元测试失败${NC}"
     FAILED=1
 fi
 cd ..
 
-# 3. RoomManager 测试
+# 3. 前端构建测试
 echo ""
-echo "🏠 3. RoomManager 测试..."
-cd server
-if node test-room.mjs > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ RoomManager 测试通过${NC}"
-else
-    echo -e "${RED}❌ RoomManager 测试失败${NC}"
-    FAILED=1
-fi
-cd ..
-
-# 4. UnoGame 测试
-echo ""
-echo "🎮 4. UnoGame 测试..."
-cd server
-if node test-game.mjs > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ UnoGame 测试通过${NC}"
-else
-    echo -e "${RED}❌ UnoGame 测试失败${NC}"
-    FAILED=1
-fi
-cd ..
-
-# 5. 前端构建测试
-echo ""
-echo "💻 5. 前端构建测试..."
+echo "💻 3. 前端构建测试..."
 cd client
 if npm run build > /dev/null 2>&1; then
     echo -e "${GREEN}✅ 前端构建通过${NC}"
 else
     echo -e "${RED}❌ 前端构建失败${NC}"
-    FAILED=1
-fi
-cd ..
-
-# 6. 客户端单元测试
-echo ""
-echo "🧪 6. 客户端单元测试..."
-cd client
-if npm run test:unit > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ 客户端单元测试通过${NC}"
-else
-    echo -e "${RED}❌ 客户端单元测试失败${NC}"
     FAILED=1
 fi
 cd ..

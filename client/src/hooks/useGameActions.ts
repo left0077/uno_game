@@ -20,7 +20,7 @@ export function useGameActions({ roomCode }: UseGameActionsV2Props) {
     challengeV2,
     isMyTurn,
     availableActions 
-  } = useSocketV2();
+  } = useSocket();
 
   /**
    * 打出单张牌

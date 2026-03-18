@@ -260,6 +260,10 @@ export function useSocket(
     socketRef.current?.emit('PLAY_COMBO', { roomCode, comboType, cardIds, targetId });
   }, []);
 
+  const playComboV2 = useCallback((roomCode: string, cardIds: string[], comboType: string, chosenColor?: string) => {
+    socketRef.current?.emit('v2:playCombo', { roomCode, cardIds, comboType, chosenColor });
+  }, []);
+
   const drawCard = useCallback((roomCode: string) => {
     socketRef.current?.emit('DRAW_CARD', { roomCode });
   }, []);
@@ -280,6 +284,10 @@ export function useSocket(
     socketRef.current?.emit('CHALLENGE_UNO', { roomCode, targetId });
   }, []);
 
+  const challengeV2 = useCallback((roomCode: string, targetId: string) => {
+    socketRef.current?.emit('v2:challenge', { roomCode, targetId });
+  }, []);
+
   const jumpIn = useCallback((roomCode: string, cardId: string) => {
     socketRef.current?.emit('JUMP_IN', { roomCode, cardId });
   }, []);
@@ -290,6 +298,10 @@ export function useSocket(
 
   const toggleHost = useCallback((roomCode: string, enabled: boolean) => {
     socketRef.current?.emit('TOGGLE_HOST', { roomCode, enabled });
+  }, []);
+
+  const refreshActionsV2 = useCallback((roomCode: string) => {
+    socketRef.current?.emit('v2:getAvailableActions', { roomCode });
   }, []);
 
   return {
@@ -321,15 +333,16 @@ export function useSocket(
     playCard,
     playCardV2,
     playCombo,
+    playComboV2,
     drawCard,
     drawCardV2,
     callUno,
     callUnoV2,
     challengeUno,
+    challengeV2,
     jumpIn,
     sendMessage,
     toggleHost,
+    refreshActionsV2,
   };
 }
-
-export type { V2GameState, V2PlayerInfo, AvailableAction, AvailableActionsV2 };
