@@ -13,11 +13,12 @@ test.describe('基础功能测试', () => {
     await page.evaluate(() => {
       localStorage.setItem('uno-server-url', 'http://localhost:3001');
     });
+    await page.reload();
+    await page.waitForLoadState('networkidle');
   });
   
   test('首页加载正常', async ({ page }) => {
-    await page.goto('/', { timeout: 30000 });
-    
+    // 已在 beforeEach 中加载页面
     // 等待页面加载
     await page.waitForLoadState('networkidle');
     
@@ -52,8 +53,7 @@ test.describe('基础功能测试', () => {
   });
 
   test('创建房间流程', async ({ page }) => {
-    await page.goto('/', { timeout: 30000 });
-    await page.waitForLoadState('networkidle');
+    // 已在 beforeEach 中加载页面和设置 localStorage
     
     // 等待连接完成（创建房间按钮变为可用）
     const createRoomBtn = page.getByRole('button', { name: /创建房间/i });

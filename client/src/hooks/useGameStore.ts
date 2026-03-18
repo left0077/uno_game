@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 import type { Room, Player, GameState, Card } from '../../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 
-// 默认服务器地址 - Render 部署的后端
-const DEFAULT_SERVER_URL = 'https://uno-server-jbbr.onrender.com';
+// 默认服务器地址
+const DEFAULT_SERVER_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 // 获取或生成用户ID
 const getOrCreateUserId = (): string => {

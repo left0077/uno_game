@@ -91,6 +91,16 @@ export function useSocket(
   const [availableActions, setAvailableActions] = useState<AvailableAction[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // 使用 ref 存储事件处理器，避免依赖项变化导致重新连接
+  const handlersRef = useRef({
+    onRoomCreated, onRoomJoined, onRoomUpdated, onPlayerJoined, onPlayerLeft,
+    onGameStarted, onGameState, onGameEnded, onReceiveMessage, onError, onAvailableActions
+  });
+  handlersRef.current = {
+    onRoomCreated, onRoomJoined, onRoomUpdated, onPlayerJoined, onPlayerLeft,
+    onGameStarted, onGameState, onGameEnded, onReceiveMessage, onError, onAvailableActions
+  };
+
   // 初始化连接
   useEffect(() => {
     const socket = io(serverUrl, {
@@ -128,40 +138,40 @@ export function useSocket(
     // 房间事件
     socket.on('room:created', (room: Room) => {
       console.log('[Socket] Room created:', room.code);
-      onRoomCreated?.(room);
+      handlersRef.current.onRoomCreated?.(room);
     });
 
     socket.on('room:joined', (data: { success: boolean; room: Room; userId: string }) => {
       console.log('[Socket] Room joined:', data.room?.code);
       if (data.success) {
-        onRoomJoined?.(data.room);
+        handlersRef.current.onRoomJoined?.(data.room);
       }
     });
 
     socket.on('room:updated', (room: Room) => {
-      onRoomUpdated?.(room);
+      handlersRef.current.onRoomUpdated?.(room);
     });
 
     socket.on('player:joined', (player: Player) => {
-      onPlayerJoined?.(player);
+      handlersRef.current.onPlayerJoined?.(player);
     });
 
     socket.on('player:left', (data: { playerId: string }) => {
-      onPlayerLeft?.(data.playerId);
+      handlersRef.current.onPlayerLeft?.(data.playerId);
     });
 
     // 游戏事件
     socket.on('game:started', (gameState: GameState) => {
       console.log('[Socket] Game started');
-      onGameStarted?.(gameState);
+      handlersRef.current.onGameStarted?.(gameState);
     });
 
     socket.on('game:state', (gameState: GameState) => {
-      onGameState?.(gameState);
+      handlersRef.current.onGameState?.(gameState);
     });
 
     socket.on('game:ended', (data: { winner: Player; rankings?: any[] }) => {
-      onGameEnded?.(data);
+      handlersRef.current.onGameEnded?.(data);
     });
 
     // V2 游戏事件
@@ -194,13 +204,13 @@ export function useSocket(
 
     // 聊天事件
     socket.on('chat:receive', (msg: any) => {
-      onReceiveMessage?.(msg);
+      handlersRef.current.onReceiveMessage?.(msg);
     });
 
     // 错误事件
     socket.on('error', (data: { code: string; message: string }) => {
       console.error('[Socket] Server error:', data);
-      onError?.(data);
+      handlersRef.current.onError?.(data);
     });
 
     return () => {
