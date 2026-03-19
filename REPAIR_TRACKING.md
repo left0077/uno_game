@@ -5,6 +5,13 @@
 ## ✅ 已完成修复
 
 ### 2026-03-19
+- ✅ **前端架构重构 - 分层架构实现**
+  - 创建 `core/` 层：SocketClient、GameEngine、RoomService、GameService
+  - 创建 `hooks/` 层：精简版 useSocket、useGameActions、useRoomActions
+  - 创建 `pages/` 层：HomePage、RoomPage、GamePage（UI 纯组件）
+  - 创建 `store/` 层：Zustand 状态管理
+  - 修复 useGameActions 中不存在的 V2 方法引用
+  - 将旧组件移至 `.bak/` 目录
 - ✅ Socket 事件命名标准化 (`domain:action` 格式)
 - ✅ 修复前端 Game.tsx socket 状态同步问题
 - ✅ 修复 E2E 测试选择器问题
