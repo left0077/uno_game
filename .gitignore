@@ -42,3 +42,6 @@ e2e/test-results/
 # Backup files
 *.bak/
 .bak/
+
+# Temp files
+.temp/

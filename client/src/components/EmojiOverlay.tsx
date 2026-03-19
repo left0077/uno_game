@@ -48,7 +48,7 @@ export const EmojiOverlay: React.FC<EmojiOverlayProps> = ({ messages, onDismiss 
   useEffect(() => {
     // 3秒后自动消失
     const timers = messages.map(msg => 
-      setTimeout(() => onDismiss(msg.timestamp), 3000)
+      setTimeout(() => onDismiss(msg.timestamp), 3000) // TODO: 使用 ANIMATION_CONFIG.emojiDisplayTime
     );
     return () => timers.forEach(clearTimeout);
   }, [messages, onDismiss]);

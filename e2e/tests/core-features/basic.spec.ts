@@ -165,15 +165,19 @@ test.describe('🏢 房间功能', () => {
 test.describe('🤖 AI 管理', () => {
   
   test('房主可以添加 AI', async ({ page }) => {
+    // 1. 用户创建房间
     await createRoom(page, '房主');
     
-    // 添加 AI
+    // 2. 用户点击添加 AI（完整流程）
     await addAI(page, 'normal');
     
-    // 验证 AI 已添加
-    const pageContent = await page.content();
-    const hasAI = /AI|机器人|Bot/i.test(pageContent);
-    expect(hasAI).toBeTruthy();
+    // 3. 截图验证结果
+    await page.screenshot({ path: 'test-results/ai-added.png' });
+    
+    // 4. 验证 AI 出现在玩家列表
+    const pageText = await page.innerText('body');
+    expect(pageText).toContain('AI');
+    expect(pageText).toContain('(2/4)'); // 房主 + 1个AI
   });
 
   test('可以添加多个 AI', async ({ page }) => {
@@ -182,13 +186,11 @@ test.describe('🤖 AI 管理', () => {
     // 添加 3 个 AI
     for (let i = 0; i < 3; i++) {
       await addAI(page, 'normal');
-      await page.waitForTimeout(500);
     }
     
-    // 验证 AI 数量
-    const pageContent = await page.content();
-    const aiMatches = pageContent.match(/AI|机器人|Bot/gi);
-    expect(aiMatches?.length || 0).toBeGreaterThanOrEqual(3);
+    // 验证玩家数量
+    const pageText = await page.innerText('body');
+    expect(pageText).toContain('(4/4)'); // 房主 + 3个AI
   });
 });
 

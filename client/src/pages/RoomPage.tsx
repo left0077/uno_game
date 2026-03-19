@@ -78,7 +78,7 @@ export function RoomPage({
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-white">
-                玩家列表 ({playerCount}/4)
+                玩家列表 ({playerCount}/{room.maxPlayers || 8})
               </h2>
               {isHost && (
                 <button
@@ -167,7 +167,7 @@ export function RoomPage({
               </div>
               <div className="flex justify-between">
                 <span>初始手牌数</span>
-                <span className="text-white">7</span>
+                <span className="text-white">{room.settings?.initialCards || 7}</span>
               </div>
               <div className="flex justify-between">
                 <span>允许联击</span>

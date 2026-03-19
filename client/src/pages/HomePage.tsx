@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react';
+import { GAME_CONFIG } from '../config';
 
 interface HomePageProps {
   nickname: string;
@@ -80,7 +81,7 @@ export function HomePage({
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             placeholder="输入昵称..."
-            maxLength={12}
+            maxLength={GAME_CONFIG.maxNicknameLength}
             className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-white/50"
           />
         </div>
@@ -128,7 +129,7 @@ export function HomePage({
               value={roomCode}
               onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
               placeholder="输入房间码 (如: ABC123)"
-              maxLength={6}
+              maxLength={GAME_CONFIG.roomCodeLength}
               className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-white/50 uppercase"
             />
             <button
@@ -144,7 +145,7 @@ export function HomePage({
 
       {/* 游戏说明 */}
       <div className="mt-8 text-white/50 text-sm text-center">
-        <p>支持 2-4 人同时游戏</p>
+        <p>支持 2-8 人同时游戏</p>
         <p className="mt-1">包含 AI 玩家、联机对战等多种玩法</p>
       </div>
     </div>

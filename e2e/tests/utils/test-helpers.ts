@@ -11,8 +11,8 @@ import { Page, BrowserContext, expect, Locator } from '@playwright/test';
 export const SELECTORS = {
   // 首页元素
   home: {
-    nicknameInput: 'input[placeholder*="请输入昵称"]',
-    createRoomBtn: 'button:has-text("创建房间")',
+    nicknameInput: 'input[placeholder*="输入昵称"]',
+    createRoomBtn: 'button:has-text("创建新房间")',
     joinRoomBtn: 'button:has-text("加入房间")',
     serverUrl: '[data-testid="server-url"], .server-url',
     connectionStatus: '[data-testid="connection-status"], .connection-status',
@@ -22,7 +22,7 @@ export const SELECTORS = {
     container: '[data-testid="room-page"], .room-page',
     roomCode: '[data-testid="room-code"], .room-code',
     playerList: '[data-testid="player-list"], .player-list',
-    addAIBtn: 'button:has-text("添加AI")',
+    addAIBtn: 'button:has-text("+ 添加 AI")',
     startGameBtn: 'button:has-text("开始游戏")',
     settingsBtn: 'button:has-text("设置")',
     leaveBtn: 'button:has-text("离开")',
@@ -135,13 +135,13 @@ export async function createRoom(
   
   // 等待页面切换（通过检测房间页面特有的元素）
   if (options?.waitForNavigation !== false) {
-    // 房间页面应该有 "添加AI" 或 "开始游戏" 按钮
+    // 房间页面应该有 "+ 添加 AI" 或 "开始游戏" 按钮
     await page.waitForFunction(
       () => {
         const content = document.body.innerText;
-        return content.includes('添加AI') || 
+        return content.includes('+ 添加 AI') || 
                content.includes('开始游戏') || 
-               content.includes('房间号');
+               content.includes('房间');
       },
       { timeout: TIMEOUTS.extraLong }
     );
@@ -210,31 +210,32 @@ export async function joinRoom(
 }
 
 /**
- * 添加 AI
+ * 添加 AI - 模拟完整用户操作流程
  */
 export async function addAI(
   page: Page,
   difficulty: 'easy' | 'normal' | 'hard' = 'normal'
 ): Promise<void> {
-  // 点击添加AI按钮
-  const addAIBtn = page.locator('button:has-text("添加AI")');
-  await addAIBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.long });
+  // 1. 点击"+ 添加 AI"按钮
+  const addAIBtn = page.locator('button:has-text("+ 添加 AI")');
   await addAIBtn.click();
   
-  await page.waitForTimeout(TIMEOUTS.short);
+  // 2. 等待设置面板出现
+  await page.waitForSelector('text=确认添加', { timeout: TIMEOUTS.medium });
   
-  // 选择难度
+  // 3. 选择难度
   const difficultyMap = {
-    easy: /简单|Easy/i,
-    normal: /普通|Normal/i,
-    hard: /困难|Hard/i,
+    easy: '简单',
+    normal: '普通', 
+    hard: '困难',
   };
+  await page.click(`button:has-text("${difficultyMap[difficulty]}")`);
   
-  const difficultyBtn = page.getByRole('button', { name: difficultyMap[difficulty] });
-  if (await difficultyBtn.isVisible().catch(() => false)) {
-    await difficultyBtn.click();
-    await page.waitForTimeout(TIMEOUTS.medium);
-  }
+  // 4. 点击确认添加
+  await page.click('button:has-text("确认添加")');
+  
+  // 5. 等待 AI 添加完成
+  await page.waitForTimeout(TIMEOUTS.medium);
 }
 
 /**

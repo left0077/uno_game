@@ -6,20 +6,24 @@
 
 ```
 docs/
-├── README.md           # 本文档
-├── rules/              # 游戏规则
-│   ├── CLASSIC_MODE.md # 经典模式
-│   └── out-mode.md     # Out 模式
+├── README.md              # 本文档
+├── rules/                 # 游戏规则
+│   ├── CLASSIC_MODE.md    # 经典模式
+│   └── out-mode.md        # Out 模式
 │
-├── architecture/       # 架构设计
+├── architecture/          # 架构设计
 │   └── README.md
 │
-├── v1.0/               # v1.0 稳定版文档
+├── assets/                # 资源文件
+│   └── screenshots/       # 截图存放目录
+│
+├── v1.0/                  # v1.0 稳定版文档
 │   └── README.md
 │
-└── v2.0/               # v2.0 开发文档
+└── v2.0/                  # v2.0 开发文档
     ├── README.md
-    └── API_DESIGN.md   # API 设计
+    ├── API_DESIGN.md      # API 设计
+    └── FEATURE_PLAN.md    # 功能规划
 ```
 
 ---

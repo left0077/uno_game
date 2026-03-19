@@ -118,9 +118,46 @@ socket.on('game:state', (state) => {
 - 运行: `cd server && npm test`
 
 ### 添加新测试
+- **E2E 测试必须模拟真实用户操作流程**，而不仅仅是验证功能存在
 - 优先使用现有辅助函数
 - 不要修改 test-helpers.ts 的结构
 - 保持测试简单直接
+
+### ⚠️ E2E 测试核心原则
+**目标**: 确保用户能够正确使用功能，而不仅仅是测试通过
+
+**正确做法**:
+```typescript
+// ✅ 模拟完整用户流程
+test('用户可以添加 AI', async ({ page }) => {
+  // 1. 用户创建房间
+  await createRoom(page, '房主');
+  
+  // 2. 用户看到添加按钮并点击
+  await expect(page.getByText('+ 添加 AI')).toBeVisible();
+  await page.click('+ 添加 AI');
+  
+  // 3. 用户选择难度
+  await expect(page.getByText('简单')).toBeVisible();
+  await page.click('text=简单');
+  
+  // 4. 用户确认添加
+  await page.click('text=确认添加');
+  
+  // 5. 验证 AI 出现在玩家列表
+  await expect(page.locator('.player-list')).toContainText('AI');
+});
+```
+
+**错误做法**:
+```typescript
+// ❌ 只验证内容存在，不验证操作流程
+test('AI 功能存在', async ({ page }) => {
+  await createRoom(page, '房主');
+  const content = await page.content();
+  expect(content).toContain('AI'); // 这只是检查字符串！
+});
+```
 
 ---
 
@@ -164,12 +201,65 @@ console.log('[Socket] Room created:', room.code);
 
 ---
 
+## 📂 文件存放规范（必须遵守）
+
+### 目录结构
+```
+项目根目录/
+├── docs/                      # 文档目录
+│   ├── README.md              # 文档索引
+│   ├── rules/                 # 游戏规则文档
+│   ├── architecture/          # 架构设计文档
+│   ├── assets/                # 正式资源文件
+│   │   ├── screenshots/       # ✅ 正式截图放这里
+│   │   ├── images/            # 其他图片
+│   │   └── diagrams/          # 架构图
+│   ├── v1.0/                  # v1.0 稳定版文档
+│   └── v2.0/                  # v2.0 开发文档
+│       ├── FEATURE_PLAN.md    # 功能规划清单
+│       └── ...
+│
+└── .temp/                     # 临时文件夹（已gitignore）
+    └── screenshots/           # 📝 临时截图放这里
+```
+
+### ⚠️ 强制规则
+
+#### 1. 截图存放
+| 类型 | 存放位置 | 说明 |
+|------|----------|------|
+| **正式截图** | `docs/assets/screenshots/` | 需要保留的截图 |
+| **临时截图** | `.temp/screenshots/` | 调试用，用完即删 |
+
+#### 2. 其他文件
+- **功能规划文档** → `docs/v2.0/FEATURE_PLAN.md`
+- **不要创建新规范文档** → 用现有的 AGENTS.md
+- **文档更新后标注时间** → `**最后更新**: YYYY-MM-DD`
+
+#### 3. .temp 目录已加入 .gitignore
+临时文件不会进入版本控制，放心使用。
+
+---
+
 ## 🔗 相关文档
 
 - `docs/rules/` - 游戏规则
 - `docs/architecture/` - 架构设计
+- `docs/v2.0/FEATURE_PLAN.md` - 功能规划
 - `.kimi/workflow.md` - 详细工作流
 
 ---
 
-**最后更新**: 2026-03-19
+**最后更新**: 2026-03-19（添加了文档存放规范、临时截图目录、E2E测试用户流程规范）
+
+## 🎯 记住的规范
+
+### E2E 测试原则（必须遵守）
+**核心目标**: 确保用户能够正确使用功能，而不仅仅是测试通过
+
+**修复 E2E 测试时必须**：
+1. 检查前端实际 UI 文本（placeholder、按钮文字等）
+2. 选择器必须与实际 DOM 匹配
+3. 测试流程必须模拟真实用户操作
+4. 验证点必须是用户可见的结果（如：AI 标签出现）
+5. 截图保存到 `.temp/screenshots/` 便于调试

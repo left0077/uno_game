@@ -35,6 +35,10 @@ export class RoomService {
       this.socket.on('room:created', (room) => {
         console.log('[RoomService] Room created:', room.code);
         this.engine.setRoom(room);
+        // 创建者就是房主
+        if (room.hostId) {
+          this.engine.setMyPlayerId(room.hostId);
+        }
         callbacks.onRoomCreated?.(room);
       })
     );
@@ -45,6 +49,10 @@ export class RoomService {
         if (data.success) {
           console.log('[RoomService] Room joined:', data.room.code);
           this.engine.setRoom(data.room);
+          // 设置当前用户ID（用于判断房主身份）
+          if (data.userId) {
+            this.engine.setMyPlayerId(data.userId);
+          }
           callbacks.onRoomJoined?.(data.room);
         }
       })
