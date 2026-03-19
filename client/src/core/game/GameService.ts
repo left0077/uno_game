@@ -53,12 +53,17 @@ export class GameService {
         console.log('[GameService] Game state updated');
         this.engine.setGameState(state);
         callbacks.onGameState?.(state);
+        
+        // 请求可用动作
+        if (state.phase === 'playing') {
+          this.requestAvailableActions();
+        }
       })
     );
 
     // 监听手牌更新
     this.unsubscribeFns.push(
-      this.socket.on('game:hand', (data) => {
+      this.socket.on('player:hand', (data) => {
         if (data.cards) {
           this.engine.setMyHand(data.cards);
           callbacks.onMyHand?.(data.cards);
@@ -68,9 +73,11 @@ export class GameService {
 
     // 监听可用动作
     this.unsubscribeFns.push(
-      this.socket.on('game:actions', (actions) => {
-        this.engine.setAvailableActions(actions);
-        callbacks.onAvailableActions?.(actions);
+      this.socket.on('player:actions', (data) => {
+        if (data.actions) {
+          this.engine.setAvailableActions(data.actions);
+          callbacks.onAvailableActions?.(data.actions);
+        }
       })
     );
 
@@ -203,6 +210,14 @@ export class GameService {
   // 超时处理
   handleTimeout(): void {
     this.socket.emit('game:timeout', {});
+  }
+
+  // 请求可用动作
+  private requestAvailableActions(): void {
+    const room = this.engine.getContext().room;
+    if (room?.code) {
+      this.socket.emit('player:actions', { roomCode: room.code });
+    }
   }
 }
 

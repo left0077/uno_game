@@ -4,10 +4,17 @@
 
 @layer base {
   :root {
-    --color-background: #0f172a;
-    --color-surface: #1e293b;
-    --color-text: #f8fafc;
-    --color-text-muted: #94a3b8;
+    /* 柔和赌场主题配色 */
+    --color-felt: #1a3d2e;           /* 柔和深绿 - 偏暖 */
+    --color-felt-dark: #122b20;      /* 更深绿色 */
+    --color-felt-light: #2d5a45;     /* 浅绿 - 柔和 */
+    --color-gold: #c9a961;           /* 柔和金色 - 降低饱和度 */
+    --color-gold-light: #dbc078;     /* 亮金 - 柔和 */
+    --color-gold-dark: #a88b4a;      /* 暗金 */
+    --color-cream: #f5f0e1;          /* 奶油色文字 */
+    --color-cream-muted: #c4b8a0;    /* 柔和灰色文字 */
+    --color-wood: #4a3728;           /* 温暖木质色 */
+    --color-wood-light: #6b4f3a;     /* 浅木色 */
   }
   
   * {
@@ -15,19 +22,121 @@
   }
   
   body {
-    @apply bg-[#0f172a] text-white antialiased;
+    @apply text-[#f5f0e1] antialiased;
     font-family: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
   }
 }
 
 @layer components {
-  .card-glow {
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  /* 柔和赌桌背景 */
+  .bg-casino {
+    background: 
+      radial-gradient(ellipse at 30% 20%, rgba(201, 169, 97, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 80%, rgba(196, 169, 138, 0.05) 0%, transparent 50%),
+      linear-gradient(160deg, #1a3d2e 0%, #142f23 40%, #122b20 100%);
   }
   
-  .card-selected {
-    transform: translateY(-20px) scale(1.05);
-    box-shadow: 0 10px 30px rgba(255, 255, 255, 0.4);
+  /* 柔和毛毡效果 */
+  .bg-felt {
+    background-color: #1a3d2e;
+    background-image: 
+      radial-gradient(circle at 20% 30%, rgba(45, 90, 69, 0.3) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(45, 90, 69, 0.2) 0%, transparent 40%);
+  }
+  
+  /* 柔和卡片 - 温暖风格 */
+  .casino-card {
+    @apply backdrop-blur-sm rounded-2xl;
+    background: rgba(26, 61, 46, 0.85);
+    border: 1px solid rgba(201, 169, 97, 0.4);
+    box-shadow: 
+      0 4px 20px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  
+  .casino-card:hover {
+    border-color: rgba(201, 169, 97, 0.6);
+    box-shadow: 
+      0 8px 30px rgba(0, 0, 0, 0.4),
+      0 0 15px rgba(201, 169, 97, 0.1);
+  }
+  
+  /* 柔和按钮 */
+  .btn-soft {
+    @apply relative font-medium rounded-xl transition-all duration-300;
+    background: linear-gradient(145deg, rgba(201, 169, 97, 0.9), rgba(168, 139, 74, 0.9));
+    border: 1px solid rgba(219, 192, 120, 0.5);
+    color: #2a2118;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+  
+  .btn-soft:hover {
+    background: linear-gradient(145deg, rgba(219, 192, 120, 0.95), rgba(201, 169, 97, 0.95));
+    box-shadow: 0 6px 20px rgba(201, 169, 97, 0.2);
+    transform: translateY(-2px);
+  }
+  
+  .btn-soft:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* 柔和绿色按钮 */
+  .btn-soft-green {
+    background: linear-gradient(145deg, rgba(74, 139, 104, 0.9), rgba(56, 107, 80, 0.9));
+    border: 1px solid rgba(96, 168, 128, 0.4);
+    color: #f5f0e1;
+  }
+  
+  .btn-soft-green:hover {
+    background: linear-gradient(145deg, rgba(96, 168, 128, 0.95), rgba(74, 139, 104, 0.95));
+  }
+  
+  /* 柔和蓝色按钮 */
+  .btn-soft-blue {
+    background: linear-gradient(145deg, rgba(74, 111, 139, 0.9), rgba(56, 85, 107, 0.9));
+    border: 1px solid rgba(128, 168, 201, 0.4);
+    color: #f5f0e1;
+  }
+  
+  .btn-soft-blue:hover {
+    background: linear-gradient(145deg, rgba(96, 145, 181, 0.95), rgba(74, 111, 139, 0.95));
+  }
+  
+  /* 柔和红色按钮 */
+  .btn-soft-red {
+    background: linear-gradient(145deg, rgba(166, 96, 96, 0.9), rgba(133, 77, 77, 0.9));
+    border: 1px solid rgba(192, 128, 128, 0.4);
+    color: #f5f0e1;
+  }
+  
+  .btn-soft-red:hover {
+    background: linear-gradient(145deg, rgba(192, 128, 128, 0.95), rgba(166, 96, 96, 0.95));
+  }
+  
+  /* 温暖边框 */
+  .warm-border {
+    border: 1px solid rgba(201, 169, 97, 0.3);
+    box-shadow: inset 0 0 20px rgba(201, 169, 97, 0.05);
+  }
+  
+  /* 赌桌区域 - 柔和 */
+  .table-area {
+    background: rgba(18, 43, 32, 0.6);
+    border: 1px solid rgba(201, 169, 97, 0.25);
+    border-radius: 24px;
+    box-shadow: 
+      inset 0 0 60px rgba(0, 0, 0, 0.3),
+      0 10px 40px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* 柔和金色文字 */
+  .text-gold {
+    color: #d4c4a0;
+  }
+  
+  .text-gold-light {
+    color: #e8dcc0;
   }
 }
 
@@ -35,4 +144,171 @@
   .text-shadow {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   }
+  
+  .text-shadow-soft {
+    text-shadow: 0 0 20px rgba(201, 169, 97, 0.2);
+  }
+}
+
+/* 掉落动画 - 带左右摇摆 */
+@keyframes fall-sway {
+  0% {
+    transform: translateY(-100px) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  5% {
+    opacity: 0.7;
+  }
+  25% {
+    transform: translateY(25vh) translateX(calc(var(--sway-amount, 20px) * 0.5)) rotate(90deg);
+  }
+  50% {
+    transform: translateY(50vh) translateX(calc(var(--sway-amount, 20px) * -0.3)) rotate(180deg);
+  }
+  75% {
+    transform: translateY(75vh) translateX(calc(var(--sway-amount, 20px) * 0.4)) rotate(270deg);
+  }
+  95% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(calc(100vh + 100px)) translateX(0) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-fall-sway {
+  animation: fall-sway linear infinite;
+  top: -100px;
+}
+
+/* ========== 2D掉落物品动画 ========== */
+
+/* 筹码自转动画 */
+@keyframes chip-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 卡片轻微摆动动画 */
+@keyframes card-float {
+  0%, 100% {
+    transform: rotate(-5deg) translateY(0);
+  }
+  50% {
+    transform: rotate(5deg) translateY(-5px);
+  }
+}
+
+/* ========== 首页入场动画 ========== */
+
+/* 淡入上移动画 */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+/* 延迟淡入 */
+.animate-fade-in-up-delay {
+  opacity: 0;
+  animation: fade-in-up 0.6s ease-out 0.2s forwards;
+}
+
+.animate-fade-in-up-delay-2 {
+  opacity: 0;
+  animation: fade-in-up 0.6s ease-out 0.4s forwards;
+}
+
+/* 标题发光动画 */
+@keyframes title-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 20px rgba(201, 169, 97, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 30px rgba(201, 169, 97, 0.5));
+  }
+}
+
+.animate-title-glow {
+  animation: title-glow 3s ease-in-out infinite;
+}
+
+/* 缓慢脉冲 */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+/* 轻微浮动 */
+@keyframes float-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-float-subtle {
+  animation: float-subtle 6s ease-in-out infinite;
+}
+
+/* 滑入动画 */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s ease-out forwards;
+}
+
+/* 滚动条 - 柔和风格 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #142f23;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(201, 169, 97, 0.4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 169, 97, 0.6);
 }

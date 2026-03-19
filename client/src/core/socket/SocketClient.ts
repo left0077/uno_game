@@ -168,6 +168,10 @@ export class SocketClient {
     this.socket.on('game:started', (data) => this.emitInternal('game:started', data));
     this.socket.on('game:state', (data) => this.emitInternal('game:state', data));
     this.socket.on('game:ended', (data) => this.emitInternal('game:ended', data));
+    
+    // 玩家个人事件
+    this.socket.on('player:hand', (data) => this.emitInternal('player:hand', data));
+    this.socket.on('player:actions', (data) => this.emitInternal('player:actions', data));
 
     // V2 游戏事件
     this.socket.on('v2:gameState', (data) => this.emitInternal('v2:gameState', data));

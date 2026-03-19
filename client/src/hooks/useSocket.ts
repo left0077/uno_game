@@ -51,15 +51,8 @@ export function useSocket(options: UseSocketOptions) {
   useEffect(() => {
     if (!serverUrl) return;
 
-    // 连接 Socket
-    socket.connect(serverUrl, {
-      userId,
-      nickname,
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
-    });
+    // 连接 Socket - SocketClient.connect(userId, nickname)
+    socket.connect(userId, nickname);
 
     // 监听连接状态
     const unsubConnect = socket.on('connect', () => {

@@ -8,25 +8,34 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Uno卡牌色
-        'uno-red': '#ef4444',
-        'uno-yellow': '#eab308',
-        'uno-green': '#22c55e',
-        'uno-blue': '#3b82f6',
-        'uno-wild': '#1f2937',
-        // 主题色
-        primary: {
-          DEFAULT: '#6366f1',
-          dark: '#4f46e5',
+        // UNO卡牌色 - 保持鲜艳但降低一点饱和度
+        'uno-red': '#e85a5a',
+        'uno-yellow': '#e8c547',
+        'uno-green': '#4caf7a',
+        'uno-blue': '#5a9bd5',
+        'uno-wild': '#3d4852',
+        // 柔和赌场主题色
+        felt: {
+          DEFAULT: '#1a3d2e',
+          dark: '#122b20',
+          light: '#2d5a45',
         },
-        surface: {
-          DEFAULT: '#1e293b',
-          light: '#334155',
+        gold: {
+          DEFAULT: '#c9a961',
+          light: '#dbc078',
+          dark: '#a88b4a',
+        },
+        cream: {
+          DEFAULT: '#f5f0e1',
+          muted: '#c4b8a0',
+        },
+        wood: {
+          DEFAULT: '#4a3728',
+          light: '#6b4f3a',
         },
       },
       animation: {
-        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'bounce-short': 'bounce 0.5s infinite',
+        'pulse-slow': 'pulse 3s ease-in-out infinite',
       },
     },
   },

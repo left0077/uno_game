@@ -12,15 +12,29 @@
  * - 不再引用不存在的 V2 方法
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { getGameEngine, getGameService } from '../core';
-import type { Card } from '../../../shared/types';
+import type { Card, GameState } from '../../../shared/types';
 
 export function useGameActions() {
   const store = useGameStore();
   const engine = getGameEngine();
   const gameService = getGameService();
+  
+  // 订阅 GameEngine 状态变化
+  const [gameState, setGameState] = useState<GameState | null>(engine.getContext().gameState);
+  const [myHand, setMyHand] = useState<Card[]>(engine.getContext().myHand);
+  const [availableActions, setAvailableActions] = useState<any[]>(engine.getContext().availableActions);
+  
+  useEffect(() => {
+    const unsubscribe = engine.subscribe((ctx) => {
+      setGameState(ctx.gameState);
+      setMyHand(ctx.myHand);
+      setAvailableActions(ctx.availableActions);
+    });
+    return unsubscribe;
+  }, [engine]);
 
   /**
    * 出牌
@@ -151,7 +165,7 @@ export function useGameActions() {
     
     // 状态
     isMyTurn: engine.isMyTurn.bind(engine),
-    availableActions: engine.getContext().availableActions,
-    myHand: engine.getContext().myHand
+    availableActions,
+    myHand
   };
 }

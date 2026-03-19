@@ -1,10 +1,7 @@
 /**
  * GamePage - 游戏页面
  * 
- * 职责：
- * - 游戏主界面
- * - 整合游戏各个子组件
- * - 管理游戏流程
+ * 柔和赌场风格版本
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -81,14 +78,17 @@ export function GamePage({ gameActions, onLeaveRoom }: GamePageProps) {
 
   if (!gameState || !room) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-white text-xl">加载中...</div>
+      <div className="min-h-screen flex items-center justify-center relative z-10">
+        <div className="casino-card px-8 py-6 text-center">
+          <div className="animate-spin w-8 h-8 border-2 border-gold border-t-transparent rounded-full mx-auto mb-4" />
+          <div className="text-gold text-lg">发牌中...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-4">
+    <div className="min-h-screen p-4 relative z-10">
       {/* 顶部信息栏 */}
       <GameHeader
         roomCode={room.code}
@@ -97,13 +97,13 @@ export function GamePage({ gameActions, onLeaveRoom }: GamePageProps) {
         onLeaveRoom={onLeaveRoom}
       />
 
-      {/* 游戏区域 */}
-      <div className="max-w-6xl mx-auto mt-6">
+      {/* 游戏区域 - 柔和赌桌 */}
+      <div className="max-w-6xl mx-auto mt-6 table-area p-6">
         {/* 其他玩家 */}
         <OtherPlayers
           players={room.players}
           currentPlayerId={gameState.currentPlayerId}
-          cardCounts={gameState.playerHandCounts}
+          cardCounts={gameState.playerHandCounts || {}}
         />
 
         {/* 牌堆区域 */}
@@ -160,24 +160,26 @@ function GameHeader({
   onLeaveRoom: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between bg-white/10 backdrop-blur-lg rounded-2xl p-4">
+    <div className="flex items-center justify-between casino-card p-4">
       <div className="flex items-center gap-4">
-        <div className="text-white">
-          <span className="text-white/60">房间: </span>
-          <span className="font-mono font-bold text-yellow-400">{roomCode}</span>
+        <div className="flex items-center gap-2 px-4 py-2 bg-felt-dark/60 border border-gold/20 rounded-xl">
+          <span className="text-cream-muted text-sm">房间:</span>
+          <span className="font-mono font-bold text-gold-light tracking-wider">{roomCode}</span>
         </div>
-        <div className="text-white/60">
-          方向: {direction === 1 ? '→' : '←'}
+        <div className="flex items-center gap-2 px-4 py-2 bg-felt-dark/60 border border-gold/20 rounded-xl">
+          <span className="text-cream-muted text-sm">方向:</span>
+          <span className="text-gold font-bold">{direction === 1 ? '→' : '←'}</span>
         </div>
       </div>
 
-      <div className="text-white">
-        当前回合: <span className="font-bold">{currentPlayer?.nickname || '...'}</span>
+      <div className="flex items-center gap-2 px-6 py-2 bg-gold/10 border border-gold/30 rounded-xl">
+        <span className="text-cream-muted text-sm">当前回合:</span>
+        <span className="font-bold text-gold-light">{currentPlayer?.nickname || '...'}</span>
       </div>
 
       <button
         onClick={onLeaveRoom}
-        className="px-4 py-2 bg-red-500/50 text-white rounded-lg hover:bg-red-500/70"
+        className="px-4 py-2 btn-soft-red rounded-lg"
       >
         离开游戏
       </button>
@@ -195,18 +197,22 @@ function OtherPlayers({
   cardCounts: Record<string, number>;
 }) {
   return (
-    <div className="flex justify-center gap-4">
+    <div className="flex justify-center gap-3 flex-wrap">
       {players.map((player) => (
         <div
           key={player.id}
-          className={`p-3 rounded-xl ${
+          className={`px-4 py-2 rounded-xl border transition-all ${
             player.id === currentPlayerId
-              ? 'bg-yellow-500/30 border border-yellow-500/50'
-              : 'bg-white/10'
+              ? 'bg-gold/15 border-gold/50 shadow-lg'
+              : 'bg-felt-dark/60 border-gold/10'
           }`}
         >
-          <div className="text-white text-sm font-medium">{player.nickname}</div>
-          <div className="text-white/60 text-xs">{cardCounts[player.id] || 0} 张</div>
+          <div className={`text-sm font-medium ${
+            player.id === currentPlayerId ? 'text-gold-light' : 'text-cream'
+          }`}>
+            {player.nickname}
+          </div>
+          <div className="text-cream-muted/60 text-xs text-center mt-0.5">{cardCounts[player.id] || 0} 张</div>
         </div>
       ))}
     </div>
@@ -216,26 +222,36 @@ function OtherPlayers({
 function DiscardPile({ topCard }: { topCard?: Card }) {
   if (!topCard) {
     return (
-      <div className="w-24 h-36 bg-black/30 rounded-xl border-2 border-white/20 flex items-center justify-center">
-        <span className="text-white/40 text-2xl">🃏</span>
+      <div className="w-24 h-36 bg-felt-dark/80 rounded-xl border-2 border-gold/20 flex items-center justify-center shadow-lg">
+        <span className="text-gold/40 text-2xl">🃏</span>
       </div>
     );
   }
 
+  const cardStyles: Record<string, string> = {
+    red: 'bg-uno-red border-red-300',
+    blue: 'bg-uno-blue border-blue-300',
+    green: 'bg-uno-green border-green-300',
+    yellow: 'bg-uno-yellow border-yellow-300',
+    wild: 'bg-slate-700 border-slate-500'
+  };
+
+  const cardContent = {
+    wild: '🌈',
+    wild4: '🌈+4',
+    skip: '⏭️',
+    reverse: '🔄',
+    draw2: '+2',
+    draw3: '+3',
+    draw4: '+4',
+    draw5: '+5',
+    draw8: '+8'
+  }[topCard.type] || topCard.value;
+
   return (
-    <div className={`w-24 h-36 rounded-xl shadow-lg flex items-center justify-center text-2xl font-bold ${
-      topCard.color === 'red' ? 'bg-red-500' :
-      topCard.color === 'blue' ? 'bg-blue-500' :
-      topCard.color === 'green' ? 'bg-green-500' :
-      topCard.color === 'yellow' ? 'bg-yellow-500' :
-      'bg-gray-800'
-    }`}>
-      {topCard.type === 'wild' ? '🌈' :
-       topCard.type === 'wild4' ? '🌈4' :
-       topCard.type === 'skip' ? '⏭️' :
-       topCard.type === 'reverse' ? '🔄' :
-       topCard.type === 'draw2' ? '+2' :
-       topCard.value}
+    <div className={`w-24 h-36 rounded-xl shadow-lg flex items-center justify-center text-2xl font-bold 
+      ${cardStyles[topCard.color] || cardStyles.wild} text-white border-2`}>
+      {cardContent}
     </div>
   );
 }
@@ -245,27 +261,40 @@ function DrawPile({ onDraw, disabled }: { onDraw: () => void; disabled: boolean 
     <button
       onClick={onDraw}
       disabled={disabled}
-      className="relative w-24 h-36 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl shadow-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform"
+      className={`relative w-24 h-36 rounded-xl shadow-lg flex items-center justify-center
+        bg-gradient-to-br from-blue-800 via-indigo-800 to-slate-800
+        border-2 border-gold/40
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 cursor-pointer'}
+        transition-all duration-300`}
     >
-      <span className="text-white text-2xl font-bold">UNO</span>
-      <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse" />
+      <span className="text-gold text-2xl font-bold tracking-wider">UNO</span>
+      {/* 柔和光点 */}
+      <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-gold/50 rounded-full" />
+      <div className="absolute bottom-2 left-2 w-1.5 h-1.5 bg-gold/50 rounded-full" />
+      {/* 可抽牌提示 */}
+      {!disabled && (
+        <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-600 rounded-full animate-pulse border-2 border-gold/50" />
+      )}
     </button>
   );
 }
 
 function ColorIndicator({ color }: { color: string }) {
-  const colorClass = {
-    red: 'bg-red-500',
-    blue: 'bg-blue-500',
-    green: 'bg-green-500',
-    yellow: 'bg-yellow-500',
-    wild: 'bg-gradient-to-r from-red-500 via-green-500 to-blue-500'
-  }[color] || 'bg-gray-500';
+  const colorConfig: Record<string, { bg: string; label: string; border: string }> = {
+    red: { bg: 'bg-uno-red', label: '红色', border: 'border-red-300' },
+    blue: { bg: 'bg-uno-blue', label: '蓝色', border: 'border-blue-300' },
+    green: { bg: 'bg-uno-green', label: '绿色', border: 'border-green-300' },
+    yellow: { bg: 'bg-uno-yellow', label: '黄色', border: 'border-yellow-300' },
+    wild: { bg: 'bg-slate-600', label: '万能', border: 'border-slate-400' }
+  };
+
+  const config = colorConfig[color] || colorConfig.wild;
 
   return (
-    <div className="flex items-center gap-2 text-white">
-      <span className="text-white/60">当前颜色:</span>
-      <div className={`w-6 h-6 rounded-full ${colorClass}`} />
+    <div className="flex items-center gap-3 px-6 py-3 casino-card">
+      <span className="text-cream-muted">当前颜色:</span>
+      <div className={`w-7 h-7 rounded-full ${config.bg} border-2 ${config.border} shadow-md`} />
+      <span className="text-gold font-medium">{config.label}</span>
     </div>
   );
 }
@@ -281,33 +310,46 @@ function MyHand({
   onPlayCard: (cardId: string) => void;
   canPlay: (cardId: string) => boolean;
 }) {
+  const cardStyles: Record<string, { bg: string; text: string; border: string }> = {
+    red: { bg: 'bg-uno-red', text: 'text-white', border: 'border-red-300' },
+    blue: { bg: 'bg-uno-blue', text: 'text-white', border: 'border-blue-300' },
+    green: { bg: 'bg-uno-green', text: 'text-white', border: 'border-green-300' },
+    yellow: { bg: 'bg-uno-yellow', text: 'text-slate-800', border: 'border-yellow-300' },
+    wild: { bg: 'bg-slate-700', text: 'text-white', border: 'border-slate-500' }
+  };
+
+  const cardContent = (card: Card) => ({
+    wild: '🌈',
+    wild4: '🌈+4',
+    skip: '⏭️',
+    reverse: '🔄',
+    draw2: '+2',
+    draw3: '+3',
+    draw4: '+4',
+    draw5: '+5',
+    draw8: '+8'
+  }[card.type] || card.value);
+
   return (
-    <div className="flex justify-center gap-2 flex-wrap">
+    <div className="flex justify-center gap-2 flex-wrap py-4">
       {cards.map((card) => {
         const playable = isMyTurn && canPlay(card.id);
+        const style = cardStyles[card.color] || cardStyles.wild;
+
         return (
           <button
             key={card.id}
             onClick={() => onPlayCard(card.id)}
             disabled={!playable}
-            className={`w-20 h-28 rounded-lg flex items-center justify-center text-lg font-bold transition-all ${
-              card.color === 'red' ? 'bg-red-500 text-white' :
-              card.color === 'blue' ? 'bg-blue-500 text-white' :
-              card.color === 'green' ? 'bg-green-500 text-white' :
-              card.color === 'yellow' ? 'bg-yellow-500 text-black' :
-              'bg-gray-800 text-white'
-            } ${
-              playable
-                ? 'hover:scale-110 hover:-translate-y-2 cursor-pointer'
-                : 'opacity-60 cursor-not-allowed'
+            className={`w-20 h-28 rounded-xl flex items-center justify-center text-lg font-bold 
+              ${style.bg} ${style.text} border-2 ${style.border}
+              transition-all duration-200 shadow-md
+              ${playable
+                ? 'hover:scale-110 hover:-translate-y-3 cursor-pointer hover:shadow-xl'
+                : 'opacity-50 cursor-not-allowed'
             }`}
           >
-            {card.type === 'wild' ? '🌈' :
-             card.type === 'wild4' ? '🌈4' :
-             card.type === 'skip' ? '⏭️' :
-             card.type === 'reverse' ? '🔄' :
-             card.type === 'draw2' ? '+2' :
-             card.value}
+            {cardContent(card)}
           </button>
         );
       })}
@@ -333,14 +375,18 @@ function GameControls({
       <button
         onClick={onDrawCard}
         disabled={!isMyTurn || !canDraw}
-        className="px-6 py-3 bg-blue-500 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-400"
+        className="px-8 py-3 btn-soft-blue text-lg disabled:opacity-50 disabled:cursor-not-allowed"
       >
         摸牌
       </button>
       <button
         onClick={onCallUno}
         disabled={!canCallUno}
-        className="px-6 py-3 bg-yellow-500 text-black rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-yellow-400"
+        className={`px-8 py-3 text-lg rounded-xl font-medium transition-all
+          ${canCallUno
+            ? 'btn-soft-red animate-pulse'
+            : 'bg-felt-dark/60 text-cream-muted border border-gold/20 cursor-not-allowed'
+        }`}
       >
         UNO!
       </button>
@@ -356,22 +402,24 @@ function ColorPickerModal({
   onCancel: () => void;
 }) {
   const colors = [
-    { key: 'red', label: '红色', class: 'bg-red-500' },
-    { key: 'blue', label: '蓝色', class: 'bg-blue-500' },
-    { key: 'green', label: '绿色', class: 'bg-green-500' },
-    { key: 'yellow', label: '黄色', class: 'bg-yellow-500' }
+    { key: 'red', label: '红色', bg: 'bg-uno-red', border: 'border-red-300' },
+    { key: 'blue', label: '蓝色', bg: 'bg-uno-blue', border: 'border-blue-300' },
+    { key: 'green', label: '绿色', bg: 'bg-uno-green', border: 'border-green-300' },
+    { key: 'yellow', label: '黄色', bg: 'bg-uno-yellow', border: 'border-yellow-300', text: 'text-slate-800' }
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
-        <h3 className="text-white text-xl font-bold mb-4 text-center">选择颜色</h3>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="casino-card p-8 max-w-sm w-full mx-4">
+        <h3 className="text-gold-light text-2xl font-bold mb-6 text-center">选择颜色</h3>
         <div className="grid grid-cols-2 gap-4">
           {colors.map((c) => (
             <button
               key={c.key}
               onClick={() => onSelect(c.key)}
-              className={`w-24 h-24 ${c.class} rounded-xl flex items-center justify-center text-white font-bold hover:scale-105 transition-transform`}
+              className={`w-full aspect-square ${c.bg} ${c.text || 'text-white'}
+                rounded-xl flex items-center justify-center font-bold text-lg
+                hover:scale-105 transition-transform shadow-lg border-2 ${c.border}`}
             >
               {c.label}
             </button>
@@ -379,7 +427,8 @@ function ColorPickerModal({
         </div>
         <button
           onClick={onCancel}
-          className="w-full mt-4 py-2 bg-white/20 text-white rounded-xl hover:bg-white/30"
+          className="w-full mt-6 py-3 bg-felt-dark/60 border border-gold/20 text-gold rounded-xl 
+            hover:border-gold/40 transition-all font-medium"
         >
           取消
         </button>
