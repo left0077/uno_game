@@ -1,10 +1,7 @@
 /**
  * RoomPage - 房间页面
  * 
- * 职责：
- * - 显示房间信息和玩家列表
- * - 房间设置调整
- * - 开始游戏按钮
+ * 柔和赌场风格版本
  */
 
 import { useState } from 'react';
@@ -47,26 +44,40 @@ export function RoomPage({
     onStartGame('out');
   };
 
-  const handleCopyRoomCode = () => {
-    navigator.clipboard.writeText(room.code);
+  const handleCopyRoomLink = () => {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const roomUrl = `${baseUrl}?room=${room.code}`;
+    navigator.clipboard.writeText(roomUrl);
   };
 
   return (
-    <div className="min-h-screen p-4">
+    <div className="min-h-screen p-4 relative z-10">
       {/* 顶部导航 */}
       <div className="flex items-center justify-between mb-6">
         <button
           onClick={onBack}
-          className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all"
+          className="px-4 py-2 casino-card text-gold hover:text-gold-light transition-all flex items-center gap-2"
         >
-          ← 返回
+          <span>←</span>
+          <span>返回</span>
         </button>
-        <div className="text-white font-medium">
-          房间: <span className="text-yellow-400 font-mono">{room.code}</span>
+        <div className="px-6 py-2 casino-card flex items-center gap-3">
+          <span className="text-cream-muted">房间:</span>
+          <span className="text-gold-light font-mono font-bold tracking-wider">{room.code}</span>
+          <button
+            onClick={handleCopyRoomLink}
+            className="text-gold/60 hover:text-gold transition-all"
+            title="复制房间链接"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+            </svg>
+          </button>
         </div>
         <button
           onClick={onLeaveRoom}
-          className="px-4 py-2 bg-red-500/50 text-white rounded-lg hover:bg-red-500/70 transition-all"
+          className="px-4 py-2 btn-soft-red rounded-lg"
         >
           离开
         </button>
@@ -75,33 +86,39 @@ export function RoomPage({
       <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 左侧：玩家列表 */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
+          <div className="casino-card p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-white">
-                玩家列表 ({playerCount}/{room.maxPlayers || 8})
+              <h2 className="text-xl font-bold text-gold-light flex items-center gap-3">
+                <span>玩家列表</span>
+                <span className="text-cream-muted text-base font-normal">
+                  ({playerCount}/{room.maxPlayers || 8})
+                </span>
               </h2>
               {isHost && (
                 <button
                   onClick={() => setShowAISettings(!showAISettings)}
-                  className="px-3 py-1 bg-blue-500/50 text-white text-sm rounded-lg hover:bg-blue-500/70"
+                  className="px-4 py-2 btn-soft-blue rounded-lg text-sm"
                 >
-                  + 添加 AI
+                  <span className="flex items-center gap-1">
+                    <span>+</span>
+                    <span>添加 AI</span>
+                  </span>
                 </button>
               )}
             </div>
 
             {/* AI 设置面板 */}
             {showAISettings && isHost && (
-              <div className="mb-4 p-4 bg-black/20 rounded-xl">
+              <div className="mb-4 p-4 bg-felt-dark/60 border border-gold/20 rounded-xl">
                 <div className="flex gap-2 mb-3">
                   {(['easy', 'normal', 'hard'] as const).map((diff) => (
                     <button
                       key={diff}
                       onClick={() => setAiDifficulty(diff)}
-                      className={`px-3 py-1 rounded-lg text-sm ${
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                         aiDifficulty === diff
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-white/10 text-white/70 hover:bg-white/20'
+                          ? 'bg-gold/20 text-gold-light border border-gold/40'
+                          : 'bg-felt-light/30 text-cream-muted'
                       }`}
                     >
                       {diff === 'easy' ? '简单' : diff === 'normal' ? '普通' : '困难'}
@@ -110,68 +127,53 @@ export function RoomPage({
                 </div>
                 <button
                   onClick={handleAddAI}
-                  disabled={playerCount >= 4}
-                  className="w-full py-2 bg-green-500/70 text-white rounded-lg hover:bg-green-500/90 disabled:opacity-50"
+                  disabled={playerCount >= 8}
+                  className="w-full py-3 btn-soft-green rounded-xl disabled:opacity-50"
                 >
                   确认添加
                 </button>
               </div>
             )}
 
-            {/* 玩家列表 */}
+            {/* 玩家列表 - 固定显示8个位置 */}
             <div className="space-y-3">
-              {room.players.map((player, index) => (
-                <PlayerItem
-                  key={player.id}
-                  player={player}
-                  index={index}
-                  isHost={player.id === room.hostId}
-                  isMe={player.id === userId}
-                  canRemove={isHost && player.isAI}
-                  onRemove={() => onRemoveAI(player.id)}
-                />
-              ))}
+              {Array.from({ length: 8 }).map((_, index) => {
+                const player = room.players[index];
+                return player ? (
+                  <PlayerItem
+                    key={player.id}
+                    player={player}
+                    index={index}
+                    isHost={player.id === room.hostId}
+                    isMe={player.id === userId}
+                    canRemove={isHost && player.isAI}
+                    onRemove={() => onRemoveAI(player.id)}
+                  />
+                ) : (
+                  <EmptyPlayerSlot key={`empty-${index}`} index={index} />
+                );
+              })}
             </div>
           </div>
         </div>
 
         {/* 右侧：房间信息和操作 */}
         <div className="space-y-4">
-          {/* 房间码 */}
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
-            <h3 className="text-white/70 text-sm mb-2">房间码</h3>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 px-4 py-3 bg-black/20 rounded-xl text-2xl font-mono font-bold text-yellow-400 tracking-wider">
-                {room.code}
-              </div>
-              <button
-                onClick={handleCopyRoomCode}
-                className="px-4 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
-                title="复制房间码"
-              >
-                📋
-              </button>
-            </div>
-            <p className="text-white/50 text-sm mt-2">
-              分享给好友让他们加入游戏
-            </p>
-          </div>
-
           {/* 游戏设置 */}
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
-            <h3 className="text-white font-bold mb-4">游戏设置</h3>
-            <div className="space-y-3 text-white/70 text-sm">
-              <div className="flex justify-between">
+          <div className="casino-card p-6">
+            <h3 className="text-gold font-bold mb-4">游戏设置</h3>
+            <div className="space-y-3 text-cream-muted text-sm">
+              <div className="flex justify-between items-center py-2 border-b border-gold/10">
                 <span>最大玩家数</span>
-                <span className="text-white">4</span>
+                <span className="text-gold font-bold">{room.maxPlayers || 8}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center py-2 border-b border-gold/10">
                 <span>初始手牌数</span>
-                <span className="text-white">{room.settings?.initialCards || 7}</span>
+                <span className="text-gold font-bold">{room.settings?.initialCards || 7}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center py-2">
                 <span>允许联击</span>
-                <span className="text-white">是</span>
+                <span className="text-gold font-bold">是</span>
               </div>
             </div>
           </div>
@@ -181,15 +183,26 @@ export function RoomPage({
             <button
               onClick={handleStartGame}
               disabled={!canStartGame}
-              className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-lg rounded-xl hover:from-green-400 hover:to-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`w-full py-4 rounded-xl text-lg font-medium transition-all disabled:cursor-not-allowed
+                ${canStartGame 
+                  ? 'btn-soft' 
+                  : 'bg-felt-dark/60 text-cream-muted border border-gold/20'}`}
             >
-              {canStartGame ? '开始游戏' : '需要至少2名玩家'}
+              {canStartGame ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span>▶</span>
+                  开始游戏
+                </span>
+              ) : (
+                '需要至少2名玩家'
+              )}
             </button>
           )}
 
           {!isHost && (
-            <div className="text-center py-4 text-white/50">
-              等待房主开始游戏...
+            <div className="text-center py-4 text-cream-muted casino-card">
+              <span className="animate-pulse">●</span>
+              <span className="ml-2">等待房主开始游戏...</span>
             </div>
           )}
         </div>
@@ -209,31 +222,42 @@ interface PlayerItemProps {
 }
 
 function PlayerItem({ player, index, isHost, isMe, canRemove, onRemove }: PlayerItemProps) {
-  const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500'];
-  const avatarColor = colors[index % colors.length];
+  // 柔和配色
+  const avatarColors = [
+    'bg-emerald-700',
+    'bg-teal-700', 
+    'bg-cyan-700',
+    'bg-slate-700'
+  ];
+  const avatarColor = avatarColors[index % avatarColors.length];
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-black/20 rounded-xl">
+    <div className="flex items-center gap-3 p-3 bg-felt-dark/60 border border-gold/10 rounded-xl">
       {/* 头像 */}
-      <div className={`w-10 h-10 ${avatarColor} rounded-full flex items-center justify-center text-white font-bold`}>
+      <div className={`w-12 h-12 ${avatarColor} rounded-full flex items-center justify-center 
+        text-cream font-bold text-lg border-2 border-gold/30`}>
         {player.nickname.charAt(0).toUpperCase()}
       </div>
 
       {/* 信息 */}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-white font-medium">
+          <span className="text-cream font-medium truncate">
             {player.nickname}
-            {isMe && <span className="ml-2 text-xs text-blue-400">(你)</span>}
           </span>
+          {isMe && (
+            <span className="px-2 py-0.5 bg-gold/20 text-gold text-xs rounded border border-gold/30">
+              你
+            </span>
+          )}
           {player.isAI && (
-            <span className="px-2 py-0.5 bg-purple-500/50 text-white text-xs rounded">
+            <span className="px-2 py-0.5 bg-blue-900/40 text-blue-300 text-xs rounded border border-blue-500/30">
               AI
             </span>
           )}
         </div>
         {isHost && (
-          <span className="text-yellow-400 text-xs">房主</span>
+          <span className="text-gold/70 text-xs">房主</span>
         )}
       </div>
 
@@ -241,11 +265,33 @@ function PlayerItem({ player, index, isHost, isMe, canRemove, onRemove }: Player
       {canRemove && (
         <button
           onClick={onRemove}
-          className="px-2 py-1 bg-red-500/50 text-white text-xs rounded hover:bg-red-500/70"
+          className="px-3 py-1.5 btn-soft-red rounded-lg text-xs"
         >
           移除
         </button>
       )}
+    </div>
+  );
+}
+
+// 空位组件
+interface EmptyPlayerSlotProps {
+  index: number;
+}
+
+function EmptyPlayerSlot({ index }: EmptyPlayerSlotProps) {
+  return (
+    <div className="flex items-center gap-3 p-3 bg-felt-dark/30 border border-gold/5 border-dashed rounded-xl">
+      {/* 空头像占位 */}
+      <div className="w-12 h-12 rounded-full flex items-center justify-center 
+        text-cream-muted/30 font-bold text-lg border-2 border-gold/10">
+        {index + 1}
+      </div>
+
+      {/* 空位提示 */}
+      <div className="flex-1 min-w-0">
+        <span className="text-cream-muted/40 text-sm">等待加入...</span>
+      </div>
     </div>
   );
 }
