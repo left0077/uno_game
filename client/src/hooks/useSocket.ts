@@ -203,7 +203,7 @@ export function useSocket(
     });
 
     // 聊天事件
-    socket.on('chat:receive', (msg: any) => {
+    socket.on('chat:message', (msg: any) => {
       handlersRef.current.onReceiveMessage?.(msg);
     });
 
@@ -221,97 +221,74 @@ export function useSocket(
   // ========== 房间操作 ==========
 
   const createRoom = useCallback((nickname: string) => {
-    socketRef.current?.emit('CREATE_ROOM', { nickname, userId });
+    socketRef.current?.emit('room:create', { nickname, userId });
   }, [userId]);
 
   const joinRoom = useCallback((roomCode: string, nickname: string) => {
-    socketRef.current?.emit('JOIN_ROOM', { roomCode, nickname, userId });
+    console.log('[Socket] Emitting room:join', { roomCode, nickname, userId });
+    socketRef.current?.emit('room:join', { roomCode, nickname, userId });
   }, [userId]);
 
   const leaveRoom = useCallback(() => {
-    socketRef.current?.emit('LEAVE_ROOM');
+    socketRef.current?.emit('room:leave');
   }, []);
 
   const reconnect = useCallback((roomCode: string, userId: string) => {
-    socketRef.current?.emit('JOIN_ROOM', { roomCode, userId });
+    socketRef.current?.emit('room:join', { roomCode, userId });
   }, []);
 
   const addAI = useCallback((roomCode: string, difficulty: string, type: string) => {
-    socketRef.current?.emit('ADD_AI', { roomCode, difficulty, type });
+    socketRef.current?.emit('ai:add', { roomCode, difficulty, type });
   }, []);
 
   const removeAI = useCallback((roomCode: string, aiId: string) => {
-    socketRef.current?.emit('REMOVE_AI', { roomCode, aiId });
+    socketRef.current?.emit('ai:remove', { roomCode, aiId });
   }, []);
 
   const updateSettings = useCallback((roomCode: string, settings: any) => {
-    socketRef.current?.emit('UPDATE_SETTINGS', { roomCode, settings });
+    socketRef.current?.emit('room:settings', { roomCode, settings });
   }, []);
 
   // ========== 游戏操作 ==========
 
-  const startGame = useCallback((roomCode: string) => {
-    socketRef.current?.emit('START_GAME', { roomCode });
-  }, []);
-
-  const startGameV2 = useCallback((roomCode: string, mode: 'standard' | 'out' = 'out') => {
-    socketRef.current?.emit('v2:gameStart', { roomCode, mode });
+  const startGame = useCallback((roomCode: string, mode: 'standard' | 'out' = 'out') => {
+    socketRef.current?.emit('room:start', { roomCode, mode });
   }, []);
 
   const playCard = useCallback((roomCode: string, cardId: string, chosenColor?: string) => {
-    socketRef.current?.emit('PLAY_CARD', { roomCode, cardId, chosenColor });
+    socketRef.current?.emit('game:play', { roomCode, cardId, chosenColor });
   }, []);
 
-  const playCardV2 = useCallback((roomCode: string, cardId: string, chosenColor?: string) => {
-    socketRef.current?.emit('v2:playCard', { roomCode, cardId, chosenColor });
-  }, []);
-
-  const playCombo = useCallback((roomCode: string, comboType: string, cardIds: string[], targetId?: string) => {
-    socketRef.current?.emit('PLAY_COMBO', { roomCode, comboType, cardIds, targetId });
-  }, []);
-
-  const playComboV2 = useCallback((roomCode: string, cardIds: string[], comboType: string, chosenColor?: string) => {
-    socketRef.current?.emit('v2:playCombo', { roomCode, cardIds, comboType, chosenColor });
+  const playCombo = useCallback((roomCode: string, cardIds: string[], comboType: string, chosenColor?: string) => {
+    socketRef.current?.emit('game:combo', { roomCode, cardIds, comboType, chosenColor });
   }, []);
 
   const drawCard = useCallback((roomCode: string) => {
-    socketRef.current?.emit('DRAW_CARD', { roomCode });
-  }, []);
-
-  const drawCardV2 = useCallback((roomCode: string) => {
-    socketRef.current?.emit('v2:draw', { roomCode });
+    socketRef.current?.emit('game:draw', { roomCode });
   }, []);
 
   const callUno = useCallback((roomCode: string) => {
-    socketRef.current?.emit('CALL_UNO', { roomCode });
-  }, []);
-
-  const callUnoV2 = useCallback((roomCode: string) => {
-    socketRef.current?.emit('v2:callUno', { roomCode });
+    socketRef.current?.emit('game:uno', { roomCode });
   }, []);
 
   const challengeUno = useCallback((roomCode: string, targetId: string) => {
-    socketRef.current?.emit('CHALLENGE_UNO', { roomCode, targetId });
-  }, []);
-
-  const challengeV2 = useCallback((roomCode: string, targetId: string) => {
-    socketRef.current?.emit('v2:challenge', { roomCode, targetId });
+    socketRef.current?.emit('game:challenge', { roomCode, targetId });
   }, []);
 
   const jumpIn = useCallback((roomCode: string, cardId: string) => {
-    socketRef.current?.emit('JUMP_IN', { roomCode, cardId });
+    socketRef.current?.emit('game:jump', { roomCode, cardId });
   }, []);
 
   const sendMessage = useCallback((roomCode: string, type: string, content: string) => {
-    socketRef.current?.emit('SEND_MESSAGE', { roomCode, type, content });
+    socketRef.current?.emit('chat:send', { roomCode, type, content });
   }, []);
 
-  const toggleHost = useCallback((roomCode: string, enabled: boolean) => {
-    socketRef.current?.emit('TOGGLE_HOST', { roomCode, enabled });
+  const toggleHosting = useCallback((roomCode: string, enabled: boolean) => {
+    socketRef.current?.emit('player:host', { roomCode, enabled });
   }, []);
 
-  const refreshActionsV2 = useCallback((roomCode: string) => {
-    socketRef.current?.emit('v2:getAvailableActions', { roomCode });
+  const getAvailableActions = useCallback((roomCode: string) => {
+    socketRef.current?.emit('player:actions', { roomCode });
   }, []);
 
   return {
@@ -339,20 +316,14 @@ export function useSocket(
 
     // 游戏操作
     startGame,
-    startGameV2,
     playCard,
-    playCardV2,
     playCombo,
-    playComboV2,
     drawCard,
-    drawCardV2,
     callUno,
-    callUnoV2,
     challengeUno,
-    challengeV2,
     jumpIn,
     sendMessage,
-    toggleHost,
-    refreshActionsV2,
+    toggleHosting,
+    getAvailableActions,
   };
 }

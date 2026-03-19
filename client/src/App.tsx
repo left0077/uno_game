@@ -156,7 +156,7 @@ function App() {
     handleGameState,
     handleGameEnded,
     undefined,
-    undefined,
+    handleError,
     undefined
   );
   
@@ -218,9 +218,9 @@ function App() {
       }, 5000);
     };
     
-    socket.socket?.on('chat:receive', handleReceiveMessage);
+    socket.socket?.on('chat:message', handleReceiveMessage);
     return () => {
-      socket.socket?.off('chat:receive', handleReceiveMessage);
+      socket.socket?.off('chat:message', handleReceiveMessage);
     };
   }, [socket.socket]);
 
@@ -257,11 +257,7 @@ function App() {
 
   const handleStartGame = useCallback(() => {
     if (store.currentRoom) {
-      // 使用 V2 Socket API 开始游戏
-      socket.socket?.emit('v2:gameStart', { 
-        roomCode: store.currentRoom.code, 
-        mode: 'out' 
-      });
+      socket.startGame(store.currentRoom.code, 'out');
     }
   }, [socket, store.currentRoom]);
 
@@ -291,7 +287,7 @@ function App() {
 
   const handleToggleHost = useCallback((enabled: boolean) => {
     if (store.currentRoom) {
-      socket.toggleHost(store.currentRoom.code, enabled);
+      socket.toggleHosting(store.currentRoom.code, enabled);
     }
   }, [socket, store.currentRoom]);
 
@@ -384,7 +380,18 @@ function App() {
       return (
         <>
           <ConnectionStatus />
-          <Game />
+          <Game 
+            socket={{
+              isConnected: socket.isConnected,
+              error: socket.error,
+              clearError: socket.clearError,
+              gameState: store.gameState,
+              myHand: socket.myHand,
+              isMyTurn: socket.isMyTurn,
+              startGame: socket.startGame,
+              getAvailableActions: socket.getAvailableActions,
+            }}
+          />
         </>
       );
 

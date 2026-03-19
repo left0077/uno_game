@@ -47,7 +47,7 @@ export function setupSocketHandlers(io: Server): void {
         const userId = data.userId || socketUserMap.get(socket.id) || socket.id;
         const room = roomManager.createRoom(userId, data.nickname);
         socket.join(room.code);
-        socket.emit('room:created', { success: true, room, userId });
+        socket.emit('room:created', room);
         console.log(`[V2] Room created: ${room.code}`);
       } catch (error) {
         socket.emit(SocketEvents.ERROR, { code: 'CREATE_ROOM_FAILED', message: '创建房间失败' });
@@ -98,9 +98,161 @@ export function setupSocketHandlers(io: Server): void {
       }
     });
 
-    // ========== V2 游戏开始 ==========
+    // ========== AI 管理 ==========
     
-    socket.on('v2:gameStart', (data: { roomCode: string; mode: 'standard' | 'out' }) => {
+    socket.on(SocketEvents.ADD_AI, (data: { roomCode: string; difficulty: 'easy' | 'normal' | 'hard'; type: 'bot' | 'host' }) => {
+      console.log(`[V2] ADD_AI received: roomCode=${data.roomCode}, difficulty=${data.difficulty}, type=${data.type}`);
+      try {
+        const room = roomManager.getRoom(data.roomCode);
+        console.log(`[V2] Room lookup result:`, room ? `found ${room.code}` : 'not found');
+        if (!room) {
+          socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
+          return;
+        }
+        
+        const userId = socketUserMap.get(socket.id) || socket.id;
+        if (room.hostId !== userId) {
+          socket.emit(SocketEvents.ERROR, { code: 'PERMISSION_DENIED', message: '只有房主可以添加AI' });
+          return;
+        }
+        
+        const aiPlayer = roomManager.addAI(data.roomCode, data.difficulty, data.type);
+        if (!aiPlayer) {
+          socket.emit(SocketEvents.ERROR, { code: 'ADD_AI_FAILED', message: '添加AI失败' });
+          return;
+        }
+        
+        io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
+        console.log(`[V2] AI added to room ${data.roomCode}: ${aiPlayer.nickname}`);
+      } catch (error) {
+        console.error('[V2] Add AI failed:', error);
+        socket.emit(SocketEvents.ERROR, { code: 'ADD_AI_FAILED', message: '添加AI失败' });
+      }
+    });
+
+    socket.on(SocketEvents.REMOVE_AI, (data: { roomCode: string; aiId: string }) => {
+      try {
+        const room = roomManager.getRoom(data.roomCode);
+        if (!room) {
+          socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
+          return;
+        }
+        
+        const userId = socketUserMap.get(socket.id) || socket.id;
+        if (room.hostId !== userId) {
+          socket.emit(SocketEvents.ERROR, { code: 'PERMISSION_DENIED', message: '只有房主可以移除AI' });
+          return;
+        }
+        
+        const success = roomManager.removeAI(data.roomCode, data.aiId);
+        if (!success) {
+          socket.emit(SocketEvents.ERROR, { code: 'REMOVE_AI_FAILED', message: '移除AI失败' });
+          return;
+        }
+        
+        io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
+        console.log(`[V2] AI removed from room ${data.roomCode}: ${data.aiId}`);
+      } catch (error) {
+        console.error('[V2] Remove AI failed:', error);
+        socket.emit(SocketEvents.ERROR, { code: 'REMOVE_AI_FAILED', message: '移除AI失败' });
+      }
+    });
+
+    // ========== 房间设置 ==========
+    
+    socket.on(SocketEvents.ROOM_SETTINGS, (data: { roomCode: string; settings: Partial<RoomSettings> }) => {
+      try {
+        const room = roomManager.getRoom(data.roomCode);
+        if (!room) {
+          socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
+          return;
+        }
+        
+        const userId = socketUserMap.get(socket.id) || socket.id;
+        if (room.hostId !== userId) {
+          socket.emit(SocketEvents.ERROR, { code: 'PERMISSION_DENIED', message: '只有房主可以修改设置' });
+          return;
+        }
+        
+        // 更新房间设置
+        Object.assign(room.settings, data.settings);
+        
+        // 广播更新
+        io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
+        console.log(`[V2] Room settings updated: ${data.roomCode}`);
+      } catch (error) {
+        console.error('[V2] Update settings failed:', error);
+        socket.emit(SocketEvents.ERROR, { code: 'UPDATE_SETTINGS_FAILED', message: '更新设置失败' });
+      }
+    });
+
+    // ========== 聊天 ==========
+    
+    socket.on(SocketEvents.CHAT_SEND, (data: { roomCode: string; type: 'text' | 'emoji'; content: string }) => {
+      try {
+        const room = roomManager.getRoom(data.roomCode);
+        if (!room) {
+          socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
+          return;
+        }
+        
+        const userId = socketUserMap.get(socket.id) || socket.id;
+        const player = room.players.find(p => p.id === userId);
+        
+        if (!player) {
+          socket.emit(SocketEvents.ERROR, { code: 'NOT_IN_ROOM', message: '不在房间中' });
+          return;
+        }
+        
+        const message = {
+          type: data.type,
+          content: data.content,
+          playerId: userId,
+          playerName: player.nickname,
+          timestamp: Date.now()
+        };
+        
+        // 广播消息
+        io.to(data.roomCode).emit('chat:message', message);
+      } catch (error) {
+        console.error('[V2] Send message failed:', error);
+      }
+    });
+
+    // ========== 托管 ==========
+    
+    socket.on(SocketEvents.PLAYER_HOST, (data: { roomCode: string; enabled: boolean }) => {
+      try {
+        const room = roomManager.getRoom(data.roomCode);
+        if (!room) {
+          socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
+          return;
+        }
+        
+        const userId = socketUserMap.get(socket.id) || socket.id;
+        const player = room.players.find(p => p.id === userId);
+        
+        if (!player) {
+          socket.emit(SocketEvents.ERROR, { code: 'NOT_IN_ROOM', message: '不在房间中' });
+          return;
+        }
+        
+        // 切换托管状态
+        player.isAI = data.enabled;
+        player.aiType = data.enabled ? 'host' : undefined;
+        
+        // 广播更新
+        io.to(data.roomCode).emit(SocketEvents.ROOM_UPDATED, room);
+        console.log(`[V2] Player hosting toggled: ${userId} = ${data.enabled}`);
+      } catch (error) {
+        console.error('[V2] Toggle hosting failed:', error);
+        socket.emit(SocketEvents.ERROR, { code: 'TOGGLE_HOSTING_FAILED', message: '切换托管失败' });
+      }
+    });
+
+    // ========== 游戏开始 ==========
+    
+    socket.on(SocketEvents.ROOM_START, (data: { roomCode: string; mode: 'standard' | 'out' }) => {
       const room = roomManager.getRoom(data.roomCode);
       const userId = socketUserMap.get(socket.id) || socket.id;
       
@@ -141,6 +293,13 @@ export function setupSocketHandlers(io: Server): void {
         
         v2Games.set(data.roomCode, gameInstance);
         room.status = 'playing';
+        
+        // 发送游戏开始事件（通知客户端跳转）
+        io.to(data.roomCode).emit('game:started', { 
+          roomCode: data.roomCode,
+          mode: data.mode,
+          players: room.players 
+        });
         
         // 发送初始状态
         broadcastGameStateV2(io, data.roomCode, gameInstance);
@@ -189,7 +348,7 @@ export function setupSocketHandlers(io: Server): void {
           handleGameEndV2(io, data.roomCode, game);
         }
       } else {
-        socket.emit('v2:actionFailed', { 
+        socket.emit(SocketEvents.ERROR, { 
           action: data.action,
           reason: 'INVALID_ACTION'
         });
@@ -198,9 +357,9 @@ export function setupSocketHandlers(io: Server): void {
 
     // ========== 快捷动作 ==========
     
-    socket.on('v2:playCard', (data: { roomCode: string; cardId: string; chosenColor?: string }) => {
+    socket.on(SocketEvents.GAME_PLAY, (data: { roomCode: string; cardId: string; chosenColor?: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      socket.emit('v2:action', {
+      socket.emit(SocketEvents.PLAYER_ACTIONS, {
         roomCode: data.roomCode,
         action: {
           type: 'play',
@@ -211,14 +370,14 @@ export function setupSocketHandlers(io: Server): void {
       });
     });
 
-    socket.on('v2:playCombo', (data: { 
+    socket.on(SocketEvents.GAME_COMBO, (data: { 
       roomCode: string; 
       cardIds: string[]; 
       comboType: string;
       chosenColor?: string;
     }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      socket.emit('v2:action', {
+      socket.emit(SocketEvents.PLAYER_ACTIONS, {
         roomCode: data.roomCode,
         action: {
           type: 'combo',
@@ -230,9 +389,9 @@ export function setupSocketHandlers(io: Server): void {
       });
     });
 
-    socket.on('v2:draw', (data: { roomCode: string }) => {
+    socket.on(SocketEvents.GAME_DRAW, (data: { roomCode: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      socket.emit('v2:action', {
+      socket.emit(SocketEvents.PLAYER_ACTIONS, {
         roomCode: data.roomCode,
         action: {
           type: 'draw',
@@ -241,9 +400,9 @@ export function setupSocketHandlers(io: Server): void {
       });
     });
 
-    socket.on('v2:callUno', (data: { roomCode: string }) => {
+    socket.on(SocketEvents.GAME_UNO, (data: { roomCode: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      socket.emit('v2:action', {
+      socket.emit(SocketEvents.PLAYER_ACTIONS, {
         roomCode: data.roomCode,
         action: {
           type: 'uno',
@@ -252,9 +411,9 @@ export function setupSocketHandlers(io: Server): void {
       });
     });
 
-    socket.on('v2:challenge', (data: { roomCode: string; targetId: string }) => {
+    socket.on(SocketEvents.GAME_CHALLENGE, (data: { roomCode: string; targetId: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      socket.emit('v2:action', {
+      socket.emit(SocketEvents.PLAYER_ACTIONS, {
         roomCode: data.roomCode,
         action: {
           type: 'challenge',
@@ -269,18 +428,18 @@ export function setupSocketHandlers(io: Server): void {
     socket.on('v2:getState', (data: { roomCode: string }) => {
       const game = v2Games.get(data.roomCode);
       if (game) {
-        socket.emit('v2:gameState', serializeGameStateV2(game));
+        socket.emit('game:state', serializeGameStateV2(game));
       }
     });
 
-    socket.on('v2:getAvailableActions', (data: { roomCode: string }) => {
+    socket.on(SocketEvents.PLAYER_ACTIONS, (data: { roomCode: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
       const game = v2Games.get(data.roomCode);
       
       if (!game) return;
       
       const actions = calculateAvailableActionsV2(game, userId);
-      socket.emit('v2:availableActions', { playerId: userId, actions });
+      socket.emit('player:actions', { playerId: userId, actions });
     });
 
     // ========== 断开连接 ==========
@@ -316,7 +475,7 @@ export function setupSocketHandlers(io: Server): void {
  */
 function broadcastGameStateV2(io: Server, roomCode: string, game: V2GameInstance): void {
   const state = serializeGameStateV2(game);
-  io.to(roomCode).emit('v2:gameState', state);
+  io.to(roomCode).emit('game:state', state);
   
   // 为每个玩家单独发送其手牌
   for (const playerId of game.state.tablePlayerIds) {
@@ -328,7 +487,7 @@ function broadcastGameStateV2(io: Server, roomCode: string, game: V2GameInstance
         for (const socketId of roomSockets) {
           const socket = io.sockets.sockets.get(socketId);
           if (socket && socketUserMap.get(socketId) === playerId) {
-            socket.emit('v2:playerHand', {
+            socket.emit('player:hand', {
               playerId,
               cards: player.cards,
               cardCount: player.cards.length
@@ -456,7 +615,7 @@ function handleGameEndV2(io: Server, roomCode: string, game: V2GameInstance): vo
     room.gameState = undefined;
   }
   
-  io.to(roomCode).emit('v2:gameEnded', {
+  io.to(roomCode).emit('game:ended', {
     winnerId: result.winnerId,
     rankings: result.rankings
   });

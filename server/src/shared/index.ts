@@ -137,27 +137,29 @@ export enum SocketEvents {
   ROOM_UPDATED = 'room:updated',
   PLAYER_JOINED = 'room:playerJoined',
   PLAYER_LEFT = 'room:playerLeft',
+  ROOM_SETTINGS = 'room:settings',
+  ROOM_START = 'room:start',
   
   // 游戏
-  GAME_START = 'game:start',
   GAME_STATE = 'game:state',
-  PLAY_CARD = 'game:playCard',
-  DRAW_CARD = 'game:drawCard',
-  CALL_UNO = 'game:callUno',
-  CHALLENGE_UNO = 'game:challengeUno',
-  JUMP_IN = 'game:jumpIn',
-  TURN_TIMEOUT = 'game:turnTimeout',
+  GAME_PLAY = 'game:play',
+  GAME_COMBO = 'game:combo',
+  GAME_DRAW = 'game:draw',
+  GAME_UNO = 'game:uno',
+  GAME_CHALLENGE = 'game:challenge',
+  GAME_JUMP = 'game:jump',
   
   // AI
   ADD_AI = 'ai:add',
   REMOVE_AI = 'ai:remove',
   
-  // 托管
-  TOGGLE_HOSTING = 'player:toggleHosting',
+  // 玩家
+  PLAYER_ACTIONS = 'player:actions',
+  PLAYER_HOST = 'player:host',
   
   // 聊天
-  SEND_MESSAGE = 'chat:send',
-  RECEIVE_MESSAGE = 'chat:receive',
+  CHAT_SEND = 'chat:send',
+  CHAT_MESSAGE = 'chat:message',
   
   // 错误
   ERROR = 'error',

@@ -27,6 +27,13 @@ export function Home({
   const [autoJoinAttempted, setAutoJoinAttempted] = useState(false);
   const [isAutoJoining, setIsAutoJoining] = useState(false);
   
+  // 当发生错误时，重置自动加入状态
+  useEffect(() => {
+    if (error && isAutoJoining) {
+      setIsAutoJoining(false);
+    }
+  }, [error, isAutoJoining]);
+  
   // 从 localStorage 读取邀请链接（App.tsx 已存入）
   useEffect(() => {
     if (autoJoinAttempted) return;

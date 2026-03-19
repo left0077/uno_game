@@ -5,11 +5,23 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useSocket } from '../hooks/useSocket';
 import { useGameActions } from '../hooks/useGameActions';
 import './Game.css';
 
-export default function Game() {
+interface GameProps {
+  socket: {
+    isConnected: boolean;
+    error: string | null;
+    clearError: () => void;
+    gameState: any;
+    myHand: any[];
+    isMyTurn: boolean;
+    startGame: (roomCode: string, mode: 'standard' | 'out') => void;
+    getAvailableActions: (roomCode: string) => void;
+  };
+}
+
+export default function Game({ socket }: GameProps) {
   const [roomCode, setRoomCode] = useState<string>('');
   const nickname = localStorage.getItem('uno-nickname') || '玩家';
   
@@ -22,7 +34,7 @@ export default function Game() {
     }
   }, []);
   
-  // Socket 连接
+  // 使用从 App.tsx 传递的 socket
   const {
     isConnected,
     error,
@@ -30,9 +42,9 @@ export default function Game() {
     gameState,
     myHand,
     isMyTurn,
-    startGameV2,
-    refreshActionsV2,
-  } = useSocket();
+    startGame,
+    getAvailableActions,
+  } = socket;
 
   // 游戏动作
   const {
@@ -56,11 +68,11 @@ export default function Game() {
     if (!roomCode || !gameState) return;
     
     const interval = setInterval(() => {
-      refreshActionsV2(roomCode);
+      getAvailableActions(roomCode);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [roomCode, gameState, refreshActionsV2]);
+  }, [roomCode, gameState, getAvailableActions]);
 
   // 处理出牌
   const handlePlayCard = (cardId: string) => {
@@ -123,7 +135,7 @@ export default function Game() {
         <p>等待游戏开始...</p>
         <button 
           className="start-btn"
-          onClick={() => roomCode && startGameV2(roomCode, 'out')}
+          onClick={() => roomCode && startGame(roomCode, 'out')}
         >
           开始 Out 模式 (V2)
         </button>
