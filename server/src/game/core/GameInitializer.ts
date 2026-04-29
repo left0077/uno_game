@@ -61,7 +61,8 @@ export class GameInitializer {
       deck,
       discardPile,
       currentColor: firstCard.color === 'wild' ? 'red' : firstCard.color,
-      turnStartTime: Date.now()
+      turnStartTime: Date.now(),
+      gameStartTime: Date.now()
     };
     
     console.log(`[GameInitializer] 游戏初始化完成：${playerIds.length}名玩家，每人${config.cardsPerPlayer}张牌`);

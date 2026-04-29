@@ -33,20 +33,21 @@ export class OutModeV2 extends BaseGameModeV2 {
     allowJumpIn: true
   };
   
-  // 阶段配置
+  // 阶段配置（规则书 v2.1：固定上限 20，时间触发 3/6/9 分钟）
   private static readonly PHASE_CONFIG = [
-    { maxCards: 12, nextOutAt: 10 },  // 阶段0: ≤12张，10张进入阶段1
-    { maxCards: 10, nextOutAt: 8 },   // 阶段1: ≤10张，8张进入阶段2
-    { maxCards: 8, nextOutAt: 6 },    // 阶段2: ≤8张，6张进入阶段3
-    { maxCards: 6, nextOutAt: 0 }     // 阶段3: ≤6张，无上限
+    { maxCards: 20, nextOutAt: 0 },
+    { maxCards: 20, nextOutAt: 0 },
+    { maxCards: 20, nextOutAt: 0 },
+    { maxCards: 20, nextOutAt: 0 },
   ];
 
-  // 连打类型与惩罚映射
-  private static readonly COMBO_PENALTY = {
-    pair: 'draw3',      // 对子 +3
-    three: 'draw5',     // 三连 +5
-    rainbow: 'draw5',   // 彩虹 +5
-    straight: 'draw8'   // 顺子 +8
+  // 连打效果（规则书 v2.1：连打不产生惩罚卡，只有战术效果）
+  // 对子: 无效果 | 三条: 下家跳过 | 彩虹: 目标+3 | 顺子: 下家 N-2
+  private static readonly COMBO_EFFECT = {
+    pair: { skip: false, draw: 0 },
+    three: { skip: true, draw: 0 },
+    rainbow: { skip: false, draw: 3 },
+    straight: {},  // draw = N - 2，动态计算
   };
 
   // ============================================================================
@@ -54,14 +55,12 @@ export class OutModeV2 extends BaseGameModeV2 {
   // ============================================================================
   
   protected onInitialize(): void {
-    // 初始化Out模式状态
     this.state.outState = {
       phase: 0,
-      maxCards: OutModeV2.PHASE_CONFIG[0].maxCards,
-      nextOutAt: OutModeV2.PHASE_CONFIG[0].nextOutAt
+      maxCards: 20,
+      nextOutAt: 0,
     };
-    
-    console.log(`[OutModeV2] 初始化完成，阶段0，手牌上限${this.state.outState.maxCards}`);
+    console.log(`[OutModeV2] 初始化完成，阶段0，手牌上限20`);
   }
 
   // ============================================================================
@@ -250,25 +249,38 @@ export class OutModeV2 extends BaseGameModeV2 {
       return;
     }
     
-    // 设置连打惩罚
-    this.applyComboPenalty(comboType!);
-    
+    // 应用连打效果（替代旧 COMBO_PENALTY）
+    this.applyComboEffect(comboType!, cardIds!.length);
+
     // 流转回合
     this.playerManager.nextTurn();
   }
 
   /**
-   * 应用连打惩罚
+   * 应用连打效果（规则书 v2.1：连打不产生惩罚卡，只有战术效果）
    */
-  private applyComboPenalty(comboType: string): void {
-    const penaltyType = OutModeV2.COMBO_PENALTY[comboType as keyof typeof OutModeV2.COMBO_PENALTY];
-    if (!penaltyType) return;
-    
-    const drawCount = parseInt(penaltyType.replace('draw', ''));
-    this.state.pendingDraw = drawCount;
-    this.state.pendingDrawType = penaltyType as any;
-    
-    console.log(`[OutModeV2] 连打惩罚: 下家需要摸 ${drawCount}张牌`);
+  private applyComboEffect(comboType: string, straightLength?: number): void {
+    if (comboType === 'pair') {
+      // 对子：无效果
+      return;
+    }
+    if (comboType === 'three') {
+      // 三条：下家跳过
+      const nextId = this.playerManager.getNextPlayerId();
+      if (nextId) this.state.skippedPlayerId = nextId;
+      return;
+    }
+    if (comboType === 'rainbow') {
+      // 彩虹：目标摸 +3
+      this.state.pendingDraw = (this.state.pendingDraw || 0) + 3;
+      return;
+    }
+    if (comboType === 'straight') {
+      // 顺子：下家摸 N-2 张
+      const n = straightLength || 3;
+      this.state.pendingDraw = (this.state.pendingDraw || 0) + (n - 2);
+      return;
+    }
   }
 
   /**
@@ -303,9 +315,14 @@ export class OutModeV2 extends BaseGameModeV2 {
    * 检查是否推进阶段
    * 当有玩家手牌 ≤ nextOutAt 时，进入下一阶段
    */
+  // 阶段推进由 GameClock 基于时间触发（Phase 4 实现）
   private checkPhaseProgression(): void {
+    return; // 暂时停用手牌数触发，等 GameClock 接管
+  }
+
+  private _checkPhaseProgressionOld(): void {
     if (!this.state.outState) return;
-    
+
     const currentPhase = this.state.outState.phase;
     if (currentPhase >= 3) return; // 最后阶段
     

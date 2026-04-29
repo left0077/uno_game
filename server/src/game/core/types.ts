@@ -58,6 +58,16 @@ export interface GameStateV2 {
   /** 回合开始时间 */
   turnStartTime: number;
   
+  // === 游戏时钟 ===
+  /** 游戏开始时间戳（用于阶段推进和全局超时） */
+  gameStartTime: number;
+
+  /** 惩罚响应截止时间（被惩罚玩家必须在此前响应） */
+  responseDeadline?: number;
+
+  /** 惩罚来源玩家 ID（反转弹回用） */
+  penaltySourceId?: string;
+
   // === Out模式特有 ===
   outState?: {
     phase: 0 | 1 | 2 | 3;

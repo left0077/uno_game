@@ -283,12 +283,12 @@ export function setupSocketHandlers(io: Server): void {
         }
 
         mode.initialize(state);
-        
+
         const gameInstance: V2GameInstance = {
           roomCode: data.roomCode,
           state,
           mode,
-          playerManager: new PlayerManager(state)
+          playerManager: mode.getPlayerManager()  // 使用 mode 内的实例，避免双重实例化
         };
         
         v2Games.set(data.roomCode, gameInstance);
