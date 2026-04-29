@@ -30,6 +30,7 @@ export interface GameCallbacks {
   onChallengeResult?: (result: any) => void;
   onPlayerSkipped?: (data: { playerId: string; reason: string }) => void;
   onPenaltyApplied?: (data: any) => void;
+  onChatMessage?: (msg: { type: string; content: string; playerId: string; playerName: string; timestamp: number }) => void;
 }
 
 export class GameService {
@@ -143,6 +144,13 @@ export class GameService {
     this.unsubscribeFns.push(
       this.socket.on('game:hostage', () => {
         // 托管状态处理
+      })
+    );
+
+    // 监听聊天/表情消息
+    this.unsubscribeFns.push(
+      this.socket.on('chat:message', (msg) => {
+        callbacks.onChatMessage?.(msg);
       })
     );
   }

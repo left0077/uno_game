@@ -44,6 +44,11 @@ interface GameStore {
   cardSelectionOpen: boolean;
   setCardSelectionOpen: (open: boolean) => void;
 
+  // 表情消息
+  emojiMessages: Array<{ playerId: string; emoji: string; target?: string; timestamp: number }>;
+  addEmojiMessage: (msg: { playerId: string; content: string; target?: string; timestamp: number }) => void;
+  clearEmojiMessages: () => void;
+
   // 方法
   resetRoomState: () => void;
   resetGameState: () => void;
@@ -73,6 +78,7 @@ export const useGameStore = create<GameStore>()(
       myHand: [],
       error: '',
       cardSelectionOpen: false,
+      emojiMessages: [],
 
       // 设置方法
       setServerUrl: (url) => set({ serverUrl: url }),
@@ -84,6 +90,10 @@ export const useGameStore = create<GameStore>()(
       setError: (error) => set({ error }),
       setGameResult: (result) => set({ gameResult: result }),
       setCardSelectionOpen: (open) => set({ cardSelectionOpen: open }),
+      addEmojiMessage: (msg) => set((s) => ({
+        emojiMessages: [...s.emojiMessages.slice(-5), { playerId: msg.playerId, emoji: msg.content, target: msg.target, timestamp: msg.timestamp }]
+      })),
+      clearEmojiMessages: () => set({ emojiMessages: [] }),
 
       // 重置方法
       resetRoomState: () => set({
@@ -92,7 +102,8 @@ export const useGameStore = create<GameStore>()(
         gameState: null,
         gameResult: null,
         myHand: [],
-        error: ''
+        error: '',
+        emojiMessages: [],
       }),
 
       resetGameState: () => set({

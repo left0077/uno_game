@@ -8,6 +8,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Card } from '../components/Card';
 import { PhaseTimer } from '../components/game/PhaseTimer';
+import { EmojiOverlay } from '../components/EmojiOverlay';
+import type { EmojiType } from '../components/EmojiOverlay';
 import type { Card as CardType } from '../../../shared/types';
 import { GAME_CONFIG } from '../config';
 
@@ -25,13 +27,16 @@ interface GamePageProps {
     isMyTurn: () => boolean;
     myHand: CardType[];
   };
+  emojiMessages?: Array<{ playerId: string; emoji: string; target?: string; timestamp: number }>;
+  onDismissEmoji?: () => void;
   onLeaveRoom: () => void;
 }
 
-export function GamePage({ gameActions, onLeaveRoom }: GamePageProps) {
+export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmoji }: GamePageProps) {
   const store = useGameStore();
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [pendingCardId, setPendingCardId] = useState<string | null>(null);
+  const [emojiMessages, setEmojiMessages] = useState<Array<{ playerId: string; emoji: EmojiType; target?: string; timestamp: number }>>([]);
 
   const gameState = store.gameState;
   const room = store.room;
@@ -159,6 +164,12 @@ export function GamePage({ gameActions, onLeaveRoom }: GamePageProps) {
       {showColorPicker && (
         <ColorPickerModal onSelect={handleColorSelect} onCancel={() => setShowColorPicker(false)} />
       )}
+
+      {/* 表情覆盖层 */}
+      <EmojiOverlay
+        messages={emojiMessages || []}
+        onDismiss={onDismissEmoji || (() => {})}
+      />
     </div>
   );
 }

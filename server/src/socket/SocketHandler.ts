@@ -36,6 +36,21 @@ const v2Games = new Map<string, V2GameInstance>();
 const socketUserMap = new Map<string, string>();
 
 export function setupSocketHandlers(io: Server): void {
+  // 设置 AI 表情回调
+  AIPlayer.onSendEmoji = (playerId, emoji, target) => {
+    const room = roomManager.getPlayerRoom(playerId);
+    if (room) {
+      const player = room.players.find(p => p.id === playerId);
+      io.to(room.code).emit('chat:message', {
+        type: 'emoji',
+        content: emoji,
+        playerId,
+        playerName: player?.nickname || 'AI',
+        timestamp: Date.now()
+      });
+    }
+  };
+
   io.on('connection', (socket: Socket) => {
     console.log('[V2] Client connected:', socket.id);
 

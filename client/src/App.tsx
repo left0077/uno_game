@@ -102,6 +102,12 @@ function App() {
     store.setError(error.message);
   }, [store]);
 
+  const handleChatMessage = useCallback((msg: any) => {
+    if (msg.type === 'emoji') {
+      store.addEmojiMessage(msg);
+    }
+  }, [store]);
+
   // Socket 回调配置
   const roomCallbacks = useMemo(() => ({
     onRoomCreated: handleRoomCreated,
@@ -114,8 +120,9 @@ function App() {
     onGameStarted: handleGameStarted,
     onGameEnded: handleGameEnded,
     onGameState: handleGameState,
-    onGameError: handleError
-  }), [handleGameStarted, handleGameEnded, handleGameState, handleError]);
+    onGameError: handleError,
+    onChatMessage: handleChatMessage,
+  }), [handleGameStarted, handleGameEnded, handleGameState, handleError, handleChatMessage]);
 
   // 使用 Socket hook
   const socket = useSocket({
@@ -186,6 +193,8 @@ function App() {
         {visiblePage === 'game' && gameStarted && (
           <GamePage
             gameActions={gameActions}
+            emojiMessages={store.emojiMessages}
+            onDismissEmoji={(ts) => store.clearEmojiMessages()}
             onLeaveRoom={handleLeaveRoom}
           />
         )}
