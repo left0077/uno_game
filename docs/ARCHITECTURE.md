@@ -59,11 +59,16 @@ BaseGameModeV2 (抽象)
 │       └── executeJumpIn      ← 移除手牌 → 抢位当前玩家
 
 OutModeV2 extends BaseGameModeV2
-├── 阶段系统 (PHASE_CONFIG): 时间触发 3/6/9 分钟
-├── 连打验证: pair(2张同色/同值), three(3张同色), rainbow(4色), straight(3张连续)
-├── 连打执行: 移除多张牌 → 设置颜色 → 效果处理 → nextTurn
+├── 阶段系统: 时间触发 3/6/9 分钟 (GameClock 驱动)
+├── 连打验证: pair(2张同色/同值), three(3张同色), rainbow(4色), straight(N≥3张连续)
+├── 连打效果: pair(无), three(下家跳过), rainbow(目标+3), straight(下家N-2)
 ├── 手牌上限: 固定 20 张，超出淘汰
-├── 惩罚卡注入: +3(Phase1), +5(Phase2), +8(Phase3)
+├── 惩罚卡注入: +3(3分钟), +5(6分钟), +8(9分钟)
+
+GameClock (新增)
+├── tick(): 每秒执行 ─ 阶段推进 / AI回合 / 回合超时 / 全局超时
+├── start() / stop()
+└── 通过回调通知 SocketHandler: onPhaseAdvance / onAITurn / onTurnTimeout / onGlobalTimeout
 
 PlayerManager
 ├── playerFinished(id)      ← 完成（从左往右填 finishedPlayerIds）
@@ -174,20 +179,21 @@ AIPlayer (静态门面)
 
 | 模块 | 状态 | 备注 |
 |------|------|------|
-| BaseGameModeV2 (核心规则引擎) | ✅ 已实现 | 模板方法模式 |
-| OutModeV2 (连打 + 淘汰) | ⚠️ 框架实现 | 代码与规则书不一致，待对齐 |
-| StandardModeV2 | ❌ 未实现 | 架构支持，缺子类 |
-| PlayerManager (排名 + 回合) | ✅ 已实现 | 有完整测试 |
-| AIPlayer (三级策略) | ✅ 已实现 | 未被游戏循环调用 |
-| 惩罚卡系统 (+3/+5/+8) | ❌ 未实现 | 类型定义存在，卡牌生成缺 |
-| 惩罚卡注入 (阶段触发) | ❌ 未实现 | 需服务端定时器 |
-| 反转 ping-pong | ❌ 未实现 | 规则已定，代码待写 |
+| BaseGameModeV2 (核心规则引擎) | ✅ 已实现 | 模板方法模式，5个P0 bug已修复 |
+| OutModeV2 (连打 + 淘汰) | ✅ 对齐规则书 v2.1 | 连打无惩罚，固定20上限，回合检查 |
+| StandardModeV2 | ❌ 待实现 | 架构支持，缺子类 |
+| PlayerManager (排名 + 回合) | ✅ 已实现 | Skip效果已生效 |
+| GameClock (时钟) | ✅ 已实现 | 阶段推进/AI触发/超时检测 |
+| AIPlayer (三级策略) | ✅ 游戏循环调用 | GameClock 自动触发 AI 回合 |
+| 惩罚卡系统 (+3/+5/+8) | ✅ 已实现 | CardManager 生成 + 阶段注入 |
+| 跨类型叠加 | ✅ 已实现 | applyDrawEffect 累加模式 |
+| 反转弹回 | ⚠️ 框架就绪 | pendingDraw 累加 + skippedPlayerId 跳过已生效 |
 | 客户端 ComboSelectorV2 | ✅ 已实现 | UI 完整 |
 | 客户端 PenaltyResponsePanel | ✅ 已实现 | UI 完整 |
 | 赌场风格 UI 主题 | ✅ 已实现 | 所有组件统一 |
-| 服务端单元测试 | ⚠️ 4/4 通过 | 需按新规则更新 |
-| 客户端单元测试 | ❌ 未实现 | vitest 未安装 |
-| E2E 测试 | ⚠️ 18 个 spec | 配置完整，需验证 |
+| 服务端单元测试 | ✅ 4/4 通过 | 对齐新规则 |
+| 客户端单元测试 | ❌ 待实现 | vitest 待安装 |
+| E2E 测试 | ⚠️ 18 个 spec | 配置完整，待验证 |
 
 ---
 
