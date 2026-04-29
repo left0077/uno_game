@@ -111,15 +111,15 @@ export function FallingItems() {
 }
 
 // 2D筹码 - 简单旋转下落
-function FallingChip({ 
-  color, 
-  size, 
+function FallingChip({
+  color,
+  size,
   rotation,
-  rotationSpeed,
+  rotationSpeed: _rs,
   duration
-}: { 
-  color: string; 
-  size: number; 
+}: {
+  color: string;
+  size: number;
   rotation: number;
   rotationSpeed: number;
   duration: number;
@@ -152,8 +152,6 @@ function FallingChip({
   };
 
   const colors = colorMap[color];
-  const totalRotation = rotation + rotationSpeed * duration;
-
   return (
     <div
       className={`relative rounded-full border-2 shadow-lg ${colors.bg} ${colors.border}`}
@@ -205,9 +203,9 @@ function FallingUnoCard({
   value,
   size, 
   rotation,
-  rotationSpeed,
+  rotationSpeed: _rs,
   duration
-}: { 
+}: {
   color: 'red' | 'yellow' | 'blue' | 'green' | 'wild'; 
   value: string;
   size: number; 
@@ -216,11 +214,11 @@ function FallingUnoCard({
   duration: number;
 }) {
   const colorMap = {
-    red: { bg: '#dc2626', gradient: 'from-red-500 to-red-700' },
-    yellow: { bg: '#ca8a04', gradient: 'from-yellow-500 to-yellow-700' },
-    blue: { bg: '#2563eb', gradient: 'from-blue-500 to-blue-700' },
-    green: { bg: '#16a34a', gradient: 'from-emerald-500 to-emerald-700' },
-    wild: { bg: '#1f2937', gradient: 'from-slate-700 to-slate-900' },
+    red: { bg: '#e53935', gradient: 'from-red-500 to-red-700', border: '#c62828' },
+    yellow: { bg: '#ffc107', gradient: 'from-yellow-400 to-yellow-600', border: '#e65100' },
+    blue: { bg: '#1e88e5', gradient: 'from-blue-500 to-blue-700', border: '#0d47a1' },
+    green: { bg: '#43a047', gradient: 'from-green-500 to-green-700', border: '#1b5e20' },
+    wild: { bg: '#212121', gradient: 'from-slate-700 to-slate-900', border: '#000' },
   };
 
   const colors = colorMap[color];

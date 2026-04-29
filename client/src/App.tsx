@@ -7,13 +7,13 @@
  * - 业务逻辑在 hooks 和 core 层处理
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { HomePage } from './pages/HomePage';
 import { RoomPage } from './pages/RoomPage';
 import { GamePage } from './pages/GamePage';
 import { useSocket, useRoomActions, useGameActions } from './hooks';
 import { useGameStore } from './store/gameStore';
-import type { Room, GameState } from '../shared/types';
+import type { Room, GameState } from '../../shared/types';
 
 type Page = 'home' | 'room' | 'game';
 
@@ -178,6 +178,7 @@ function App() {
             onRemoveAI={roomActions.removeAI}
             onLeaveRoom={roomActions.leaveRoom}
             onBack={handleLeaveRoom}
+            onUpdateSettings={roomActions.updateSettings}
           />
         )}
 

@@ -8,12 +8,12 @@ export default {
   theme: {
     extend: {
       colors: {
-        // UNO卡牌色 - 保持鲜艳但降低一点饱和度
-        'uno-red': '#e85a5a',
-        'uno-yellow': '#e8c547',
-        'uno-green': '#4caf7a',
-        'uno-blue': '#5a9bd5',
-        'uno-wild': '#3d4852',
+        // UNO卡牌色 - 高饱和度赌场风格
+        'uno-red': '#e53935',
+        'uno-yellow': '#ffc107',
+        'uno-green': '#43a047',
+        'uno-blue': '#1e88e5',
+        'uno-wild': '#212121',
         // 柔和赌场主题色
         felt: {
           DEFAULT: '#1a3d2e',

@@ -18,28 +18,41 @@ export interface SocketEvents {
   'connect': void;
   'disconnect': void;
   'connect_error': Error;
-  
+
   // 房间事件
   'room:created': Room;
   'room:joined': { success: boolean; room: Room; userId: string };
   'room:updated': Room;
   'room:playerJoined': Player;
   'room:playerLeft': { playerId: string };
-  
+
   // 游戏事件
-  'game:started': GameState;
+  'game:started': { roomCode: string; mode: string; players: Player[] };
   'game:state': GameState;
   'game:ended': { winner: Player; rankings?: any[] };
-  
+
+  // 游戏内事件
+  'player:hand': { playerId: string; cards: any[]; cardCount: number };
+  'player:actions': { playerId: string; actions: any[] };
+  'game:turn': { playerId: string; deadline: number };
+  'game:error': { code: string; message: string };
+  'game:drawn': { card: any; playerId: string };
+  'game:played': any;
+  'game:unoCalled': { playerId: string };
+  'game:challengeResult': any;
+  'game:playerSkipped': { playerId: string; reason: string };
+  'game:penalty': any;
+  'game:hostage': any;
+
   // V2 游戏事件
   'v2:gameState': any;
   'v2:playerHand': { playerId: string; cards: any[] };
   'v2:availableActions': { playerId: string; actions: any[] };
   'v2:actionFailed': { action: any; reason: string };
-  
+
   // 聊天事件
   'chat:message': any;
-  
+
   // 错误事件
   'error': { code: string; message: string };
 }

@@ -88,12 +88,12 @@ function ComboCard({ combo, isSelected, onSelect }: {
     <motion.div
       layout
       className={`
-        relative p-4 rounded-xl border-2 transition-all cursor-pointer
-        ${isSelected 
-          ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20' 
-          : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+        relative p-4 rounded-xl border transition-all cursor-pointer
+        ${isSelected
+          ? 'bg-gold/10 border-gold/50 shadow-lg shadow-gold/10'
+          : 'bg-felt-dark/60 border-gold/10 hover:border-gold/30'
         }
-        ${combo.recommended ? 'ring-2 ring-yellow-400/50' : ''}
+        ${combo.recommended ? 'ring-2 ring-gold/50' : ''}
       `}
       onClick={onSelect}
       whileHover={{ scale: 1.01 }}
@@ -112,8 +112,8 @@ function ComboCard({ combo, isSelected, onSelect }: {
         <div className="flex items-center gap-2">
           <span className="text-2xl">{comboTypeIcons[combo.type]}</span>
           <div>
-            <div className="font-bold text-white">{combo.name}</div>
-            <div className="text-xs text-slate-400">{comboTypeNames[combo.type]}</div>
+            <div className="font-bold text-gold-light">{combo.name}</div>
+            <div className="text-xs text-cream-muted">{comboTypeNames[combo.type]}</div>
           </div>
         </div>
         
@@ -124,13 +124,13 @@ function ComboCard({ combo, isSelected, onSelect }: {
       </div>
       
       {/* 效果描述 */}
-      <div className="mb-3 p-2 bg-slate-900/50 rounded-lg">
-        <div className="text-sm text-slate-300 flex items-center gap-2">
-          <Zap className="w-4 h-4 text-yellow-400" />
+      <div className="mb-3 p-2 bg-felt-dark/80 rounded-lg border border-gold/10">
+        <div className="text-sm text-cream flex items-center gap-2">
+          <Zap className="w-4 h-4 text-gold" />
           {combo.effect.description}
         </div>
         {combo.effect.target && (
-          <div className="text-xs text-slate-500 mt-1">
+          <div className="text-xs text-cream-muted mt-1">
             目标: {combo.effect.target}
           </div>
         )}
@@ -138,7 +138,7 @@ function ComboCard({ combo, isSelected, onSelect }: {
       
       {/* 需要的卡牌 */}
       <div className="space-y-2">
-        <div className="text-xs text-slate-500">需要的卡牌:</div>
+        <div className="text-xs text-cream-muted">需要的卡牌:</div>
         <div className="flex flex-wrap gap-1">
           {combo.requiredCards.map((card) => (
             <div
@@ -159,7 +159,7 @@ function ComboCard({ combo, isSelected, onSelect }: {
       
       {/* 缺失卡牌提示 */}
       {!hasAllCards && (
-        <div className="mt-3 p-2 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2">
+        <div className="mt-3 p-2 bg-red-900/20 border border-red-500/30 rounded-lg flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
           <span className="text-xs text-red-300">
             还缺 {missingCount} 张牌才能组成此连打
@@ -173,7 +173,7 @@ function ComboCard({ combo, isSelected, onSelect }: {
           e.stopPropagation();
           setShowDetails(!showDetails);
         }}
-        className="mt-3 text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1"
+        className="mt-3 text-xs text-cream-muted hover:text-cream flex items-center gap-1"
       >
         <Info className="w-3 h-3" />
         {showDetails ? '收起详情' : '查看详情'}
@@ -188,12 +188,12 @@ function ComboCard({ combo, isSelected, onSelect }: {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="mt-3 pt-3 border-t border-slate-700 space-y-2">
+            <div className="mt-3 pt-3 border-t border-gold/10 space-y-2">
               {/* 风险因素 */}
               {combo.risk.factors.length > 0 && (
                 <div>
-                  <div className="text-xs text-slate-500 mb-1">风险因素:</div>
-                  <ul className="text-xs text-slate-400 list-disc list-inside">
+                  <div className="text-xs text-cream-muted mb-1">风险因素:</div>
+                  <ul className="text-xs text-cream-muted list-disc list-inside">
                     {combo.risk.factors.map((factor, idx) => (
                       <li key={idx}>{factor}</li>
                     ))}
@@ -203,14 +203,14 @@ function ComboCard({ combo, isSelected, onSelect }: {
               
               {/* 评分 */}
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">推荐度:</span>
-                <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
+                <span className="text-xs text-cream-muted">推荐度:</span>
+                <div className="flex-1 h-2 bg-felt-dark rounded-full overflow-hidden border border-gold/10">
+                  <div
+                    className="h-full bg-gradient-to-r from-gold-dark to-gold"
                     style={{ width: `${combo.score}%` }}
                   />
                 </div>
-                <span className="text-xs text-slate-300">{combo.score}</span>
+                <span className="text-xs text-cream">{combo.score}</span>
               </div>
             </div>
           </motion.div>
@@ -225,15 +225,10 @@ function ComboCard({ combo, isSelected, onSelect }: {
  */
 export function ComboSelectorV2({
   starters,
-  selectedCards: _selectedCards,
   isOpen,
   onClose,
   onExecute,
 }: ComboSelectorV2Props) {
-  // 预留参数 selectedCards，用于未来扩展连打卡牌预选功能
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _reserved = _selectedCards;
-  
   const [selectedCombo, setSelectedCombo] = useState<ComboInfo | null>(null);
   
   // 收集所有连打选项
@@ -287,30 +282,30 @@ export function ComboSelectorV2({
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl"
+        className="casino-card max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部 */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
+        <div className="flex items-center justify-between p-6 border-b border-gold/10">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/20 rounded-lg">
-              <Layers className="w-6 h-6 text-blue-400" />
+            <div className="p-2 bg-gold/10 rounded-lg">
+              <Layers className="w-6 h-6 text-gold" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">连打选择</h2>
-              <p className="text-sm text-slate-400">
-                {executableCombos.length > 0 
-                  ? `有 ${executableCombos.length} 种可执行的连打` 
+              <h2 className="text-xl font-bold text-gold-light">连打选择</h2>
+              <p className="text-sm text-cream-muted">
+                {executableCombos.length > 0
+                  ? `有 ${executableCombos.length} 种可执行的连打`
                   : '暂无完整连打组合'}
               </p>
             </div>
           </div>
-          
+
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-felt-dark/80 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-slate-400" />
+            <X className="w-5 h-5 text-cream-muted" />
           </button>
         </div>
         
@@ -321,8 +316,8 @@ export function ComboSelectorV2({
               {/* 可执行的连打 */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <Shield className="w-4 h-4 text-green-400" />
-                  <h3 className="text-sm font-bold text-slate-300">可执行</h3>
+                  <Shield className="w-4 h-4 text-emerald-400" />
+                  <h3 className="text-sm font-bold text-cream">可执行</h3>
                 </div>
                 <div className="grid gap-3">
                   {executableCombos.map(({ combo, starter }) => (
@@ -338,9 +333,9 @@ export function ComboSelectorV2({
             </div>
           ) : (
             <div className="text-center py-12">
-              <Layers className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400">暂无可执行的连打组合</p>
-              <p className="text-sm text-slate-500 mt-2">
+              <Layers className="w-12 h-12 text-gold/30 mx-auto mb-4" />
+              <p className="text-cream-muted">暂无可执行的连打组合</p>
+              <p className="text-sm text-cream-muted/60 mt-2">
                 收集更多相同数字或颜色的牌来组成连打
               </p>
             </div>
@@ -348,10 +343,10 @@ export function ComboSelectorV2({
           
           {/* 不完整的连打 */}
           {incompleteCombos.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-slate-800">
+            <div className="mt-6 pt-6 border-t border-gold/10">
               <div className="flex items-center gap-2 mb-3">
-                <Info className="w-4 h-4 text-slate-500" />
-                <h3 className="text-sm font-bold text-slate-500">即将完成</h3>
+                <Info className="w-4 h-4 text-cream-muted" />
+                <h3 className="text-sm font-bold text-cream-muted">即将完成</h3>
               </div>
               <div className="grid gap-3 opacity-60">
                 {incompleteCombos.slice(0, 3).map(({ combo, starter }) => (
@@ -368,22 +363,22 @@ export function ComboSelectorV2({
         </div>
         
         {/* 底部操作栏 */}
-        <div className="flex items-center justify-between p-6 border-t border-slate-800 bg-slate-900/50">
-          <div className="text-sm text-slate-400">
+        <div className="flex items-center justify-between p-6 border-t border-gold/10 bg-felt-dark/30">
+          <div className="text-sm text-cream-muted">
             {selectedCombo ? (
               <span className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-400" />
+                <Check className="w-4 h-4 text-emerald-400" />
                 已选择: {selectedCombo.name}
               </span>
             ) : (
               '选择一种连打执行'
             )}
           </div>
-          
+
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+              className="px-4 py-2 text-cream-muted hover:text-cream transition-colors"
             >
               取消
             </button>
@@ -393,8 +388,8 @@ export function ComboSelectorV2({
               className={`
                 px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-all
                 ${selectedCombo
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  ? 'btn-soft-green text-white'
+                  : 'bg-felt-dark/60 text-cream-muted border border-gold/20 cursor-not-allowed'
                 }
               `}
             >

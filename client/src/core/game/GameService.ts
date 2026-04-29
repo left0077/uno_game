@@ -9,10 +9,15 @@
 
 import { SocketClient, getSocketClient } from '../socket/SocketClient';
 import { GameEngine, getGameEngine, GameAction } from './GameEngine';
-import type { GameState, Card, GameError } from '../../../../shared/types';
+import type { GameState, Card } from '../../../../shared/types';
+
+interface GameError {
+  code: string;
+  message: string;
+}
 
 export interface GameCallbacks {
-  onGameStarted?: (data: { roomCode: string; mode: string }) => void;
+  onGameStarted?: (data: { roomCode: string; mode: string; players: any[] }) => void;
   onGameState?: (state: GameState) => void;
   onMyHand?: (cards: Card[]) => void;
   onAvailableActions?: (actions: any[]) => void;
@@ -147,7 +152,7 @@ export class GameService {
 
     // 监听托管状态
     this.unsubscribeFns.push(
-      this.socket.on('game:hostage', (data) => {
+      this.socket.on('game:hostage', () => {
         // 托管状态处理
       })
     );
@@ -184,32 +189,72 @@ export class GameService {
   }
 
   playCard(payload: { cardId: string; chosenColor?: string }): void {
-    this.socket.emit('game:play', payload);
+    const roomCode = this.getRoomCode();
+    if (!roomCode) {
+      console.warn('[GameService] No room code available');
+      return;
+    }
+    this.socket.emit('game:play', { ...payload, roomCode });
   }
 
   playCombo(payload: { cardIds: string[]; comboType: string; chosenColor?: string }): void {
-    this.socket.emit('game:combo', payload);
+    const roomCode = this.getRoomCode();
+    if (!roomCode) {
+      console.warn('[GameService] No room code available');
+      return;
+    }
+    this.socket.emit('game:combo', { ...payload, roomCode });
   }
 
   drawCard(): void {
-    this.socket.emit('game:draw', {});
+    const roomCode = this.getRoomCode();
+    if (!roomCode) {
+      console.warn('[GameService] No room code available');
+      return;
+    }
+    this.socket.emit('game:draw', { roomCode });
   }
 
   callUno(): void {
-    this.socket.emit('game:uno', {});
+    const roomCode = this.getRoomCode();
+    if (!roomCode) {
+      console.warn('[GameService] No room code available');
+      return;
+    }
+    this.socket.emit('game:uno', { roomCode });
   }
 
   challengePlayer(targetId: string): void {
-    this.socket.emit('game:challenge', { targetId });
+    const roomCode = this.getRoomCode();
+    if (!roomCode) {
+      console.warn('[GameService] No room code available');
+      return;
+    }
+    this.socket.emit('game:challenge', { targetId, roomCode });
   }
 
   setJump(jump: boolean): void {
-    this.socket.emit('game:jump', { jump });
+    const roomCode = this.getRoomCode();
+    if (!roomCode) {
+      console.warn('[GameService] No room code available');
+      return;
+    }
+    this.socket.emit('game:jump', { jump, roomCode });
   }
 
   // 超时处理
   handleTimeout(): void {
-    this.socket.emit('game:timeout', {});
+    const roomCode = this.getRoomCode();
+    if (!roomCode) {
+      console.warn('[GameService] No room code available');
+      return;
+    }
+    this.socket.emit('game:timeout', { roomCode });
+  }
+
+  private getRoomCode(): string | null {
+    const room = this.engine.getContext().room;
+    return room?.code || null;
   }
 
   // 请求可用动作

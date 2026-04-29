@@ -33,7 +33,7 @@ export function ComboSelector({
     // 显示可用连打提示
     if (combos.length > 0) {
       return (
-        <span className="text-xs text-slate-400">{combos.length}种连打可用</span>
+        <span className="text-xs text-cream-muted">{combos.length}种连打可用</span>
       );
     }
     return null;
@@ -45,7 +45,7 @@ export function ComboSelector({
       {matchedCombo ? (
         <button
           onClick={onExecuteCombo}
-          className="px-4 py-1.5 rounded-lg text-sm font-bold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-600/25 animate-pulse"
+          className="px-4 py-1.5 rounded-lg text-sm font-bold bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-lg shadow-emerald-600/25 animate-pulse border border-emerald-400/30"
         >
           {matchedCombo.name} ✓
         </button>
@@ -55,7 +55,7 @@ export function ComboSelector({
       {selectedCards.length > 0 && (
         <button
           onClick={onCancel}
-          className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+          className="px-3 py-1.5 rounded-lg text-sm text-cream-muted hover:text-cream hover:bg-felt-dark/80 border border-gold/20 transition-all"
         >
           取消
         </button>

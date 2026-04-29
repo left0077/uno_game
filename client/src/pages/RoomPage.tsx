@@ -18,6 +18,7 @@ interface RoomPageProps {
   onRemoveAI: (aiId: string) => void;
   onLeaveRoom: () => void;
   onBack: () => void;
+  onUpdateSettings: (settings: { mode: 'standard' | 'out' }) => void;
 }
 
 export function RoomPage({
@@ -30,10 +31,14 @@ export function RoomPage({
   onAddAI,
   onRemoveAI,
   onLeaveRoom,
-  onBack
+  onBack,
+  onUpdateSettings
 }: RoomPageProps) {
   const [showAISettings, setShowAISettings] = useState(false);
   const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
+
+  // 从房间设置获取当前游戏模式
+  const gameMode = room.settings?.mode || 'standard';
 
   const handleAddAI = () => {
     onAddAI(aiDifficulty, 'bot');
@@ -41,7 +46,12 @@ export function RoomPage({
   };
 
   const handleStartGame = () => {
-    onStartGame('out');
+    onStartGame(gameMode);
+  };
+
+  const handleModeChange = (mode: 'standard' | 'out') => {
+    if (!isHost) return;
+    onUpdateSettings({ mode });
   };
 
   const handleCopyRoomLink = () => {
@@ -162,6 +172,46 @@ export function RoomPage({
           {/* 游戏设置 */}
           <div className="casino-card p-6">
             <h3 className="text-gold font-bold mb-4">游戏设置</h3>
+            
+            {/* 游戏模式选择 - 仅房主可编辑 */}
+            <div className="mb-4">
+              <label className="text-cream-muted text-sm block mb-2">游戏模式</label>
+              <div className="flex gap-2 p-1 bg-felt-dark/50 rounded-xl border border-gold/10 relative">
+                {/* 滑动背景 */}
+                <div 
+                  className="absolute top-1 bottom-1 bg-gold/20 rounded-lg border border-gold/30
+                    transition-all duration-300 ease-out"
+                  style={{
+                    left: gameMode === 'standard' ? '4px' : '50%',
+                    width: 'calc(50% - 4px)',
+                  }}
+                />
+                <button
+                  onClick={() => handleModeChange('standard')}
+                  disabled={!isHost}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors duration-200 relative z-10
+                    ${gameMode === 'standard' ? 'text-gold-light' : 'text-cream-muted'}
+                    ${isHost ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                >
+                  标准模式
+                </button>
+                <button
+                  onClick={() => handleModeChange('out')}
+                  disabled={!isHost}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors duration-200 relative z-10
+                    ${gameMode === 'out' ? 'text-gold-light' : 'text-cream-muted'}
+                    ${isHost ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                >
+                  Out模式
+                </button>
+              </div>
+              <p className="text-cream-muted/50 text-xs mt-2">
+                {gameMode === 'standard' 
+                  ? '经典UNO规则，先出完手牌者获胜'
+                  : '大逃杀变体，手牌上限20张，超出即淘汰'}
+              </p>
+            </div>
+
             <div className="space-y-3 text-cream-muted text-sm">
               <div className="flex justify-between items-center py-2 border-b border-gold/10">
                 <span>最大玩家数</span>
@@ -171,9 +221,15 @@ export function RoomPage({
                 <span>初始手牌数</span>
                 <span className="text-gold font-bold">{room.settings?.initialCards || 7}</span>
               </div>
+              {gameMode === 'out' && (
+                <div className="flex justify-between items-center py-2 border-b border-gold/10">
+                  <span>手牌上限</span>
+                  <span className="text-gold font-bold">20张（超出淘汰）</span>
+                </div>
+              )}
               <div className="flex justify-between items-center py-2">
                 <span>允许联击</span>
-                <span className="text-gold font-bold">是</span>
+                <span className="text-gold font-bold">{gameMode === 'out' ? '是' : '否'}</span>
               </div>
             </div>
           </div>

@@ -19,7 +19,6 @@ import {
   getRoomService,
   getGameService
 } from '../core';
-import type { SocketClient } from '../core/socket/SocketClient';
 import type { GameCallbacks, RoomCallbacks } from '../core';
 
 export interface UseSocketOptions {

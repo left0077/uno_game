@@ -359,15 +359,34 @@ export function setupSocketHandlers(io: Server): void {
     
     socket.on(SocketEvents.GAME_PLAY, (data: { roomCode: string; cardId: string; chosenColor?: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      socket.emit(SocketEvents.PLAYER_ACTIONS, {
-        roomCode: data.roomCode,
-        action: {
-          type: 'play',
-          playerId: userId,
-          cardIds: [data.cardId],
-          chosenColor: data.chosenColor as any
+      const game = v2Games.get(data.roomCode);
+      
+      if (!game) {
+        socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
+        return;
+      }
+
+      const action: GameActionV2 = {
+        type: 'play',
+        playerId: userId,
+        cardIds: [data.cardId],
+        chosenColor: data.chosenColor as any,
+        timestamp: Date.now()
+      };
+
+      const success = game.mode.handleAction(action);
+      
+      if (success) {
+        broadcastGameStateV2(io, data.roomCode, game);
+        if (game.state.phase === 'finished') {
+          handleGameEndV2(io, data.roomCode, game);
         }
-      });
+      } else {
+        socket.emit(SocketEvents.ERROR, { 
+          action,
+          reason: 'INVALID_ACTION'
+        });
+      }
     });
 
     socket.on(SocketEvents.GAME_COMBO, (data: { 
@@ -377,50 +396,120 @@ export function setupSocketHandlers(io: Server): void {
       chosenColor?: string;
     }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      socket.emit(SocketEvents.PLAYER_ACTIONS, {
-        roomCode: data.roomCode,
-        action: {
-          type: 'combo',
-          playerId: userId,
-          cardIds: data.cardIds,
-          comboType: data.comboType as any,
-          chosenColor: data.chosenColor as any
+      const game = v2Games.get(data.roomCode);
+      
+      if (!game) {
+        socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
+        return;
+      }
+
+      const action: GameActionV2 = {
+        type: 'combo',
+        playerId: userId,
+        cardIds: data.cardIds,
+        comboType: data.comboType as any,
+        chosenColor: data.chosenColor as any,
+        timestamp: Date.now()
+      };
+
+      const success = game.mode.handleAction(action);
+      
+      if (success) {
+        broadcastGameStateV2(io, data.roomCode, game);
+        if (game.state.phase === 'finished') {
+          handleGameEndV2(io, data.roomCode, game);
         }
-      });
+      } else {
+        socket.emit(SocketEvents.ERROR, { 
+          action,
+          reason: 'INVALID_ACTION'
+        });
+      }
     });
 
     socket.on(SocketEvents.GAME_DRAW, (data: { roomCode: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      socket.emit(SocketEvents.PLAYER_ACTIONS, {
-        roomCode: data.roomCode,
-        action: {
-          type: 'draw',
-          playerId: userId
+      const game = v2Games.get(data.roomCode);
+      
+      if (!game) {
+        socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
+        return;
+      }
+
+      const action: GameActionV2 = {
+        type: 'draw',
+        playerId: userId,
+        timestamp: Date.now()
+      };
+
+      const success = game.mode.handleAction(action);
+      
+      if (success) {
+        broadcastGameStateV2(io, data.roomCode, game);
+        if (game.state.phase === 'finished') {
+          handleGameEndV2(io, data.roomCode, game);
         }
-      });
+      } else {
+        socket.emit(SocketEvents.ERROR, { 
+          action,
+          reason: 'INVALID_ACTION'
+        });
+      }
     });
 
     socket.on(SocketEvents.GAME_UNO, (data: { roomCode: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      socket.emit(SocketEvents.PLAYER_ACTIONS, {
-        roomCode: data.roomCode,
-        action: {
-          type: 'uno',
-          playerId: userId
-        }
-      });
+      const game = v2Games.get(data.roomCode);
+      
+      if (!game) {
+        socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
+        return;
+      }
+
+      const action: GameActionV2 = {
+        type: 'uno',
+        playerId: userId,
+        timestamp: Date.now()
+      };
+
+      const success = game.mode.handleAction(action);
+      
+      if (success) {
+        broadcastGameStateV2(io, data.roomCode, game);
+      } else {
+        socket.emit(SocketEvents.ERROR, { 
+          action,
+          reason: 'INVALID_ACTION'
+        });
+      }
     });
 
     socket.on(SocketEvents.GAME_CHALLENGE, (data: { roomCode: string; targetId: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
-      socket.emit(SocketEvents.PLAYER_ACTIONS, {
-        roomCode: data.roomCode,
-        action: {
-          type: 'challenge',
-          playerId: userId,
-          targetId: data.targetId
-        }
-      });
+      const game = v2Games.get(data.roomCode);
+      
+      if (!game) {
+        socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
+        return;
+      }
+
+      const action: GameActionV2 = {
+        type: 'challenge',
+        playerId: userId,
+        targetId: data.targetId,
+        timestamp: Date.now()
+      };
+
+      const success = game.mode.handleAction(action);
+      
+      if (success) {
+        broadcastGameStateV2(io, data.roomCode, game);
+      } else {
+        socket.emit(SocketEvents.ERROR, { 
+          action,
+          reason: 'INVALID_ACTION'
+        });
+      }
     });
 
     // ========== 查询接口 ==========

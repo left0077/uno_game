@@ -57,7 +57,7 @@ function generateUUID(): string {
 
 export const useGameStore = create<GameStore>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       // 初始值
       serverUrl: import.meta.env.VITE_SERVER_URL || 'http://localhost:3001',
       userId: generateUUID(),

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 
 export type EmojiType = 
   | 'thinking' 
@@ -66,9 +66,9 @@ export const EmojiOverlay: React.FC<EmojiOverlayProps> = ({ messages, onDismiss 
             top: `${20 + Math.floor(index / 3) * 25}%`,
           }}
         >
-          <div className="bg-white rounded-full px-4 py-2 shadow-lg border-2 border-yellow-400">
+          <div className="bg-felt-dark/95 backdrop-blur rounded-full px-4 py-2 shadow-lg border-2 border-gold/40">
             <span className="text-3xl">{emojiMap[msg.emoji]}</span>
-            <span className="ml-2 text-sm font-bold text-gray-700">
+            <span className="ml-2 text-sm font-bold text-cream">
               {emojiText[msg.emoji]}
             </span>
           </div>

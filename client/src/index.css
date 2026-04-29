@@ -148,6 +148,175 @@
   .text-shadow-soft {
     text-shadow: 0 0 20px rgba(201, 169, 97, 0.2);
   }
+  
+  /* ========== UNO 卡牌样式 ========== */
+  
+  /* 卡牌基础样式 - 赌场风格 */
+  .uno-card {
+    position: relative;
+    border-radius: 12px;
+    box-shadow: 
+      0 4px 6px -1px rgba(0, 0, 0, 0.3),
+      0 2px 4px -2px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+  
+  /* 卡牌金色边框效果 */
+  .uno-card::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 8px;
+    pointer-events: none;
+  }
+  
+  /* 卡牌内阴影效果 */
+  .uno-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.15) 0%,
+      transparent 50%,
+      rgba(0, 0, 0, 0.1) 100%
+    );
+    pointer-events: none;
+    border-radius: 12px;
+  }
+  
+  /* 卡牌悬停效果 - 提升和发光 */
+  .uno-card-hover:hover:not(:disabled) {
+    transform: translateY(-8px) scale(1.05);
+    box-shadow: 
+      0 20px 25px -5px rgba(0, 0, 0, 0.4),
+      0 8px 10px -6px rgba(0, 0, 0, 0.3),
+      0 0 20px rgba(201, 169, 97, 0.3);
+    z-index: 10;
+  }
+  
+  /* 卡牌选中状态 */
+  .uno-card-selected {
+    transform: translateY(-12px) scale(1.08);
+    box-shadow: 
+      0 25px 30px -5px rgba(0, 0, 0, 0.5),
+      0 0 0 4px rgba(201, 169, 97, 0.6),
+      0 0 30px rgba(201, 169, 97, 0.4);
+    z-index: 20;
+  }
+  
+  /* 卡牌可玩状态 - 绿色光环 */
+  .uno-card-playable {
+    box-shadow: 
+      0 0 0 3px rgba(76, 175, 80, 0.6),
+      0 10px 15px -3px rgba(76, 175, 80, 0.3);
+    animation: playable-pulse 2s ease-in-out infinite;
+  }
+  
+  @keyframes playable-pulse {
+    0%, 100% {
+      box-shadow: 
+        0 0 0 3px rgba(76, 175, 80, 0.6),
+        0 10px 15px -3px rgba(76, 175, 80, 0.3);
+    }
+    50% {
+      box-shadow: 
+        0 0 0 4px rgba(76, 175, 80, 0.8),
+        0 15px 20px -3px rgba(76, 175, 80, 0.4);
+    }
+  }
+  
+  /* 卡牌背面 - 赌场风格 */
+  .uno-card-back {
+    background: linear-gradient(145deg, #1a1f2e 0%, #0f1419 100%);
+    border: 2px solid rgba(201, 169, 97, 0.5);
+  }
+  
+  .uno-card-back::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border: 2px solid rgba(201, 169, 97, 0.3);
+    border-radius: 8px;
+    background: 
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 8px,
+        rgba(201, 169, 97, 0.05) 8px,
+        rgba(201, 169, 97, 0.05) 16px
+      );
+  }
+  
+  /* 卡牌中心椭圆 */
+  .uno-card-center {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 50%;
+    box-shadow: 
+      inset 0 2px 4px rgba(0, 0, 0, 0.2),
+      0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  
+  /* 卡牌数字/符号样式 */
+  .uno-card-symbol {
+    font-weight: 900;
+    text-shadow: 
+      0 2px 4px rgba(0, 0, 0, 0.4),
+      0 -1px 0 rgba(255, 255, 255, 0.2);
+    letter-spacing: -0.02em;
+  }
+  
+  /* 角落标记 */
+  .uno-card-corner {
+    font-weight: 800;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    line-height: 1;
+  }
+  
+  /* 卡牌颜色 */
+  .uno-card-red {
+    background: linear-gradient(145deg, #ef5350 0%, #c62828 100%);
+    border-color: #b71c1c;
+  }
+  
+  .uno-card-yellow {
+    background: linear-gradient(145deg, #ffca28 0%, #ff8f00 100%);
+    border-color: #e65100;
+  }
+  
+  .uno-card-green {
+    background: linear-gradient(145deg, #66bb6a 0%, #2e7d32 100%);
+    border-color: #1b5e20;
+  }
+  
+  .uno-card-blue {
+    background: linear-gradient(145deg, #42a5f5 0%, #1565c0 100%);
+    border-color: #0d47a1;
+  }
+  
+  .uno-card-wild {
+    background: linear-gradient(145deg, #424242 0%, #212121 100%);
+    border-color: #000;
+  }
+  
+  /* 禁用状态 */
+  .uno-card-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.3);
+  }
+  
+  /* 卡牌点击反馈 */
+  .uno-card:active:not(:disabled) {
+    transform: scale(0.95);
+  }
 }
 
 /* 掉落动画 - 带左右摇摆 */

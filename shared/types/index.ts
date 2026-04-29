@@ -48,6 +48,10 @@ export interface RoomSettings {
   scoringMode: boolean;
   // 游戏模式
   mode: GameMode;
+  // 初始手牌数
+  initialCards?: number;
+  // 最大玩家数
+  maxPlayers?: number;
 }
 
 // Out模式状态（3阶段机制）
@@ -60,15 +64,17 @@ export interface OutState {
 // 游戏状态
 export interface GameState {
   currentPlayerId: string;
-  direction: 'clockwise' | 'counterclockwise';
+  direction: 'clockwise' | 'counterclockwise' | 1 | -1; // 支持字符串和数字
   deck: Card[];
   discardPile: Card[];
+  topCard?: Card; // 弃牌堆顶部的牌（用于显示）
   currentColor: string;
   turnTimer: number;
   turnStartTime: number;
   lastAction?: GameAction;
   winner?: string;
-  players: Player[]; // 包含每个玩家的手牌信息
+  players: Player[]; // 包含每个玩家的手牌信息（不含具体手牌，只含cardCount）
+  playerHandCounts?: Record<string, number>; // 玩家手牌数量映射
   pendingDraw?: number; // 连打累积的摸牌数
   pendingDrawType?: 'draw2' | 'draw3' | 'draw4' | 'draw5' | 'draw8'; // 连打的类型（同类型可叠加，draw8万能可叠加任何）
   rankings?: string[]; // 出完牌的玩家排名（按先后顺序）
@@ -77,6 +83,7 @@ export interface GameState {
   outState?: OutState; // Out模式状态
   gameStartTime?: number; // 游戏开始时间戳（缩圈模式需要）
   humanPlayerCount?: number; // 开局真人数量（缩圈模式需要）
+  phase?: 'waiting' | 'playing' | 'finished'; // 游戏阶段
 }
 
 // 游戏动作

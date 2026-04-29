@@ -29,15 +29,15 @@ export function OutStatus({ phase, countdown }: OutStatusProps) {
       {/* 倒计时显示 */}
       {phase < 3 && countdown > 0 && (
         <div
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold ${
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold border ${
             countdown <= 30000
-              ? 'bg-red-600/30 text-red-400 border border-red-500/50 animate-pulse'
+              ? 'bg-red-900/30 text-red-300 border-red-500/50 animate-pulse'
               : countdown <= 60000
-              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-              : 'bg-slate-800 text-slate-300'
+              ? 'bg-amber-900/30 text-amber-300 border-amber-500/40'
+              : 'bg-felt-dark/80 text-cream border-gold/20'
           }`}
         >
-          <span className="text-xs">🔥</span>
+          <span className="text-xs">⏳</span>
           <Clock className="w-4 h-4" />
           <span className="text-sm font-mono">{formatTime(Math.floor(countdown / 1000))}</span>
         </div>
@@ -45,18 +45,18 @@ export function OutStatus({ phase, countdown }: OutStatusProps) {
 
       {/* 阶段指示 */}
       <div
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold ${
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold border ${
           phase === 1
-            ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+            ? 'bg-amber-900/30 text-amber-300 border-amber-500/40'
             : phase === 2
-            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-            : 'bg-purple-600/30 text-purple-400 border border-purple-500/50 animate-pulse'
+            ? 'bg-red-900/30 text-red-300 border-red-500/50'
+            : 'bg-purple-900/40 text-purple-300 border-purple-500/50 animate-pulse'
         }`}
       >
         <span className="text-xs">
-          {phase === 1 ? '🔥 Out I - 上限15张' : phase === 2 ? '🔥🔥 Out II - 上限8张' : '💀 终极圈 - 上限3张'}
+          {phase === 1 ? 'Phase I' : phase === 2 ? 'Phase II' : 'Phase III'}
         </span>
-        <span className="text-xs text-red-400 font-bold">超出即淘汰！</span>
+        <span className="text-xs text-red-400 font-bold">超限淘汰</span>
       </div>
     </div>
   );

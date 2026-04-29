@@ -12,26 +12,36 @@ interface CardProps {
 }
 
 const sizeClasses = {
-  sm: { container: 'w-12 h-16', text: 'text-xs', icon: 'w-4 h-4' },
-  md: { container: 'w-16 h-24', text: 'text-base', icon: 'w-6 h-6' },
-  lg: { container: 'w-24 h-36', text: 'text-2xl', icon: 'w-10 h-10' }
+  sm: { 
+    container: 'w-10 h-14 sm:w-14 sm:h-20', 
+    text: 'text-xs sm:text-sm', 
+    icon: 'w-4 h-4 sm:w-6 sm:h-6',
+    center: 'w-6 h-6 sm:w-10 sm:h-10',
+    corner: 'text-[10px] sm:text-xs'
+  },
+  md: { 
+    container: 'w-14 h-20 sm:w-20 sm:h-28', 
+    text: 'text-base sm:text-xl', 
+    icon: 'w-7 h-7 sm:w-10 sm:h-10',
+    center: 'w-10 h-10 sm:w-16 sm:h-16',
+    corner: 'text-xs sm:text-sm'
+  },
+  lg: { 
+    container: 'w-20 h-28 sm:w-28 sm:h-40', 
+    text: 'text-2xl sm:text-3xl', 
+    icon: 'w-10 h-10 sm:w-14 sm:h-14',
+    center: 'w-14 h-14 sm:w-22 sm:h-22',
+    corner: 'text-base sm:text-lg'
+  }
 };
 
 const colorClasses: Record<string, string> = {
-  red: 'bg-red-500 border-red-600',
-  yellow: 'bg-yellow-400 border-yellow-500',
-  green: 'bg-green-500 border-green-600',
-  blue: 'bg-blue-500 border-blue-600',
-  wild: 'bg-slate-800 border-slate-900'
+  red: 'uno-card-red',
+  yellow: 'uno-card-yellow',
+  green: 'uno-card-green',
+  blue: 'uno-card-blue',
+  wild: 'uno-card-wild'
 };
-
-// const colorText: Record<string, string> = {
-//   red: 'text-red-500',
-//   yellow: 'text-yellow-500',
-//   green: 'text-green-500',
-//   blue: 'text-blue-500',
-//   wild: 'text-slate-400'
-// };
 
 export function Card({ 
   card, 
@@ -47,79 +57,95 @@ export function Card({
   if (isBack) {
     return (
       <motion.div
-        className={`${classes.container} rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-700 shadow-lg flex items-center justify-center`}
+        className={`${classes.container} uno-card uno-card-back flex items-center justify-center`}
         whileHover={!disabled ? { scale: 1.05 } : {}}
         whileTap={!disabled ? { scale: 0.95 } : {}}
       >
-        <div className="w-3/4 h-3/4 rounded border-2 border-slate-600/50 flex items-center justify-center">
-          <span className="text-2xl">🎴</span>
+        <div className="relative z-10 flex items-center justify-center">
+          <span className="text-3xl filter drop-shadow-lg">🃏</span>
         </div>
       </motion.div>
     );
   }
 
   const bgClass = colorClasses[card.color] || colorClasses.wild;
-  const textColor = card.color === 'wild' ? 'text-white' : 'text-white';
+  const textColor = 'text-white';
 
   const getContent = () => {
     switch (card.type) {
       case 'number':
-        return <span className={`font-bold ${classes.text}`}>{card.value}</span>;
+        return <span className={`uno-card-symbol ${classes.text}`}>{card.value}</span>;
       case 'skip':
-        return <span className={`font-bold ${classes.text}`}>🚫</span>;
+        return (
+          <div className="relative flex items-center justify-center">
+            <span className={`${classes.icon} filter drop-shadow-lg`}>🚫</span>
+          </div>
+        );
       case 'reverse':
-        return <span className={`font-bold ${classes.text}`}>↩️</span>;
+        return (
+          <div className="relative flex items-center justify-center">
+            <span className={`${classes.icon} filter drop-shadow-lg`}>↩️</span>
+          </div>
+        );
       case 'draw2':
-        return <span className={`font-bold ${classes.text}`}>+2</span>;
+        return <span className={`uno-card-symbol ${classes.text}`}>+2</span>;
       case 'draw3':
-        return <span className={`font-bold ${classes.text}`}>+3</span>;
+        return <span className={`uno-card-symbol ${classes.text}`}>+3</span>;
       case 'draw4':
-        return <span className={`font-bold ${classes.text}`}>+4</span>;
+        return <span className={`uno-card-symbol ${classes.text}`}>+4</span>;
       case 'draw5':
-        return <span className={`font-bold ${classes.text}`}>+5</span>;
+        return <span className={`uno-card-symbol ${classes.text}`}>+5</span>;
       case 'draw8':
-        return <span className={`font-bold ${classes.text}`}>+8</span>;
+        return <span className={`uno-card-symbol ${classes.text}`}>+8</span>;
       case 'wild':
-        return <span className={`font-bold ${classes.text}`}>🌈</span>;
+        return (
+          <div className="relative flex items-center justify-center">
+            <span className={`${classes.icon} filter drop-shadow-lg`}>🌈</span>
+          </div>
+        );
       default:
-        return <span>?</span>;
+        return <span className={`uno-card-symbol ${classes.text}`}>?</span>;
     }
+  };
+
+  const getCornerLabel = () => {
+    if (card.type === 'number') return card.value;
+    return getShortLabel(card.type);
   };
 
   return (
     <motion.div
       className={`
         ${classes.container} 
-        rounded-lg 
+        uno-card 
         ${bgClass} 
-        border-2 
-        shadow-lg 
         flex flex-col 
         justify-between 
-        p-1.5
+        p-2
         cursor-pointer
         select-none
-        ${isSelected ? 'ring-4 ring-white shadow-2xl' : ''}
-        ${isPlayable ? 'ring-2 ring-green-400 shadow-lg shadow-green-400/50' : 'ring-1 ring-slate-600/30'}
-        ${disabled ? 'cursor-not-allowed' : 'hover:shadow-xl'}
+        ${isSelected ? 'uno-card-selected' : ''}
+        ${isPlayable ? 'uno-card-playable uno-card-hover' : ''}
+        ${disabled ? 'uno-card-disabled' : 'uno-card-hover'}
       `}
       onClick={!disabled ? onClick : undefined}
-      whileHover={!disabled ? { scale: 1.05 } : {}}
       whileTap={!disabled ? { scale: 0.95 } : {}}
     >
       {/* 左上角 */}
-      <div className={`text-xs font-bold ${textColor}`}>
-        {card.type === 'number' ? card.value : getShortLabel(card.type)}
+      <div className={`uno-card-corner ${classes.corner} ${textColor}`}>
+        {getCornerLabel()}
       </div>
 
-      {/* 中间 */}
+      {/* 中间椭圆区域 */}
       <div className="flex-1 flex items-center justify-center">
-        {getContent()}
+        <div className={`${classes.center} uno-card-center`}>
+          {getContent()}
+        </div>
       </div>
 
       {/* 右下角（旋转） */}
-      <div className={`text-xs font-bold ${textColor} rotate-180`}>
-        {card.type === 'number' ? card.value : getShortLabel(card.type)}
+      <div className={`uno-card-corner ${classes.corner} ${textColor} rotate-180`}>
+        {getCornerLabel()}
       </div>
     </motion.div>
   );
@@ -127,14 +153,14 @@ export function Card({
 
 function getShortLabel(type: string): string {
   const labels: Record<string, string> = {
-    skip: 'skip',
-    reverse: 'rev',
+    skip: '⊘',
+    reverse: '⇄',
     draw2: '+2',
     draw3: '+3',
     draw4: '+4',
     draw5: '+5',
     draw8: '+8',
-    wild: 'wild'
+    wild: '★'
   };
   return labels[type] || type;
 }
@@ -146,44 +172,47 @@ interface ColorPickerProps {
 }
 
 export function ColorPicker({ onSelect, onCancel }: ColorPickerProps) {
-  const colors: Array<{ color: 'red' | 'yellow' | 'green' | 'blue'; bg: string; label: string }> = [
-    { color: 'red', bg: 'bg-red-500 hover:bg-red-400', label: '红色' },
-    { color: 'yellow', bg: 'bg-yellow-400 hover:bg-yellow-300', label: '黄色' },
-    { color: 'green', bg: 'bg-green-500 hover:bg-green-400', label: '绿色' },
-    { color: 'blue', bg: 'bg-blue-500 hover:bg-blue-400', label: '蓝色' }
+  const colors: Array<{ color: 'red' | 'yellow' | 'green' | 'blue'; bg: string; label: string; shadow: string }> = [
+    { color: 'red', bg: 'from-red-500 to-red-700', label: '红色', shadow: 'shadow-red-500/50' },
+    { color: 'yellow', bg: 'from-yellow-400 to-yellow-600', label: '黄色', shadow: 'shadow-yellow-500/50' },
+    { color: 'green', bg: 'from-green-500 to-green-700', label: '绿色', shadow: 'shadow-green-500/50' },
+    { color: 'blue', bg: 'from-blue-500 to-blue-700', label: '蓝色', shadow: 'shadow-blue-500/50' }
   ];
 
   return (
     <motion.div 
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
       <motion.div 
-        className="bg-slate-800 rounded-2xl p-6 shadow-2xl border border-slate-700"
+        className="casino-card p-4 sm:p-8 max-w-xs sm:max-w-sm w-full mx-auto"
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.8, opacity: 0 }}
       >
-        <h3 className="text-xl font-bold text-white text-center mb-6">选择颜色</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {colors.map(({ color, bg, label }) => (
+        <h3 className="text-gold-light text-xl sm:text-2xl font-bold text-center mb-4 sm:mb-6">选择颜色</h3>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          {colors.map(({ color, bg, label, shadow }) => (
             <motion.button
               key={color}
               onClick={() => onSelect(color)}
-              className={`w-24 h-24 ${bg} rounded-xl shadow-lg flex flex-col items-center justify-center gap-2 transition-all`}
-              whileHover={{ scale: 1.05 }}
+              className={`w-full aspect-square bg-gradient-to-br ${bg} rounded-xl shadow-lg ${shadow} 
+                flex flex-col items-center justify-center gap-2 transition-all
+                border-2 border-white/20 active:scale-95 sm:active:scale-100`}
+              whileHover={{ scale: 1.05, boxShadow: `0 0 30px currentColor` }}
               whileTap={{ scale: 0.95 }}
             >
-              <div className="w-12 h-12 rounded-full bg-white/30" />
-              <span className="text-white font-bold">{label}</span>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 backdrop-blur-sm shadow-inner" />
+              <span className="text-white font-bold text-sm sm:text-lg drop-shadow-lg">{label}</span>
             </motion.button>
           ))}
         </div>
         <button
           onClick={onCancel}
-          className="w-full mt-4 py-2 text-slate-400 hover:text-white transition-colors"
+          className="w-full mt-4 sm:mt-6 py-2.5 sm:py-3 bg-felt-dark/60 border border-gold/20 text-gold rounded-xl 
+            hover:border-gold/40 transition-all font-medium hover:bg-felt-dark/80 text-sm sm:text-base"
         >
           取消
         </button>

@@ -23,7 +23,7 @@ export function useGameActions() {
   const gameService = getGameService();
   
   // 订阅 GameEngine 状态变化
-  const [gameState, setGameState] = useState<GameState | null>(engine.getContext().gameState);
+  const [_gameState, setGameState] = useState<GameState | null>(engine.getContext().gameState);
   const [myHand, setMyHand] = useState<Card[]>(engine.getContext().myHand);
   const [availableActions, setAvailableActions] = useState<any[]>(engine.getContext().availableActions);
   

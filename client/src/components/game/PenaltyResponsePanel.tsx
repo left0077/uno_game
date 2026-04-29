@@ -11,15 +11,14 @@
  * - 接受惩罚
  */
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Shield, 
-  Zap, 
-  Rainbow, 
-  RotateCcw, 
+import { motion } from 'framer-motion';
+import {
+  Shield,
+  Zap,
+  Rainbow,
+  RotateCcw,
   Hand,
-  AlertTriangle,
-  ChevronRight
+  AlertTriangle
 } from 'lucide-react';
 import type { PenaltyOption } from '../../../../shared/actionApi';
 
@@ -72,28 +71,8 @@ function getOptionColor(type: PenaltyOption['type']): string {
     case 'accept':
       return 'bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30';
     default:
-      return 'bg-slate-700 border-slate-600 text-slate-400';
+      return 'bg-felt-dark/60 border-gold/10 text-cream-muted';
   }
-}
-
-/**
- * 获取优先级标签
- */
-function getPriorityLabel(priority: number): string {
-  if (priority >= 90) return '推荐';
-  if (priority >= 70) return '优选';
-  if (priority >= 50) return '可选';
-  return '备选';
-}
-
-/**
- * 获取优先级颜色
- */
-function getPriorityColor(priority: number): string {
-  if (priority >= 90) return 'text-green-400 bg-green-500/20';
-  if (priority >= 70) return 'text-blue-400 bg-blue-500/20';
-  if (priority >= 50) return 'text-yellow-400 bg-yellow-500/20';
-  return 'text-slate-400 bg-slate-500/20';
 }
 
 /**
@@ -116,11 +95,11 @@ export function PenaltyResponsePanel({
       exit={{ opacity: 0, scale: 0.9 }}
       className="fixed top-24 left-4 z-30"
     >
-      <div className="bg-slate-900/90 backdrop-blur border border-red-500/30 rounded-xl p-3 shadow-xl">
+      <div className="casino-card backdrop-blur border border-red-500/30 rounded-xl p-3 shadow-xl">
         {/* 标题 */}
-        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-700">
+        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gold/10">
           <AlertTriangle className="w-4 h-4 text-red-400" />
-          <span className="text-sm font-bold text-white">+{pendingCount}</span>
+          <span className="text-sm font-bold text-gold-light">+{pendingCount} 惩罚</span>
         </div>
 
         {/* 选项列表 */}
