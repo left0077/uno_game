@@ -194,7 +194,7 @@ function App() {
           <GamePage
             gameActions={gameActions}
             emojiMessages={store.emojiMessages}
-            onDismissEmoji={(ts) => store.clearEmojiMessages()}
+            onDismissEmoji={() => store.clearEmojiMessages()}
             onLeaveRoom={handleLeaveRoom}
           />
         )}

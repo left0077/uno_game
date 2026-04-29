@@ -39,8 +39,6 @@ export function PhaseTimer({ gameStartTime, phaseTimes, currentPhase, maxCards }
   const isUrgent = nextPhaseIn !== null && nextPhaseIn <= 30;
   const isWarning = nextPhaseIn !== null && nextPhaseIn <= 60 && nextPhaseIn > 30;
 
-  const phaseNames = ['常规', '加压', '高压', '终局'];
-
   return (
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors duration-500 ${
       isUrgent ? 'bg-red-900/40 border border-red-500/50 text-red-300' :

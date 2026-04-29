@@ -10,7 +10,7 @@
 import { Server, Socket } from 'socket.io';
 import { RoomManager, roomManager } from '../rooms/RoomManager.js';
 import { AIPlayer } from '../game/ai/index.js';
-import { SocketEvents, Player, Room, RoomSettings } from '../shared/index.js';
+import { SocketEvents, Player, Room, RoomSettings, Card } from '../shared/index.js';
 import { ACTION_API_VERSION } from '../shared/actionApi.js';
 import { GameStateV2, GameActionV2, calculateResult } from '../game/core/types.js';
 import { PlayerManager } from '../game/core/PlayerManager.js';
@@ -804,6 +804,19 @@ function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): an
       }
     }
 
+    // 连打检测（仅 Out 模式，无惩罚时）
+    if (game.mode.name === 'out' && !hasPending) {
+      const combos = detectCombos(player.cards);
+      for (const combo of combos) {
+        actions.push({
+          type: 'combo',
+          comboType: combo.type,
+          cardIds: combo.cardIds,
+          label: combo.label,
+        });
+      }
+    }
+
     // 惩罚信息
     if (hasPending) {
       actions.push({
@@ -821,6 +834,80 @@ function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): an
   }
   
   return actions;
+}
+
+/**
+ * 连打检测（服务端权威）
+ * 使用与 OutModeV2 相同的验证规则
+ */
+function detectCombos(cards: Card[]): Array<{ type: string; cardIds: string[]; label: string }> {
+  const results: Array<{ type: string; cardIds: string[]; label: string }> = [];
+  const normal = cards.filter(c => c.type !== 'wild' && c.type !== 'draw4' && c.type !== 'draw8');
+  if (normal.length < 2) return results;
+
+  // 按颜色和数值分组
+  const byColor = new Map<string, Card[]>();
+  const byValue = new Map<number, Card[]>();
+  for (const c of normal) {
+    if (!byColor.has(c.color)) byColor.set(c.color, []);
+    byColor.get(c.color)!.push(c);
+    const v = Number(c.value);
+    if (!isNaN(v)) {
+      if (!byValue.has(v)) byValue.set(v, []);
+      byValue.get(v)!.push(c);
+    }
+  }
+
+  // 对子（同值2张）
+  for (const [, cards] of byValue) {
+    if (cards.length >= 2) {
+      results.push({ type: 'pair', cardIds: [cards[0].id, cards[1].id], label: `对子${cards[0].value}` });
+    }
+  }
+
+  // 三条（同色3张）
+  for (const [, cards] of byColor) {
+    if (cards.length >= 3) {
+      results.push({ type: 'three', cardIds: cards.slice(0, 3).map(c => c.id), label: '三条' + cards[0].color });
+    }
+  }
+
+  // 彩虹（四色同值）
+  for (const [, cards] of byValue) {
+    if (cards.length >= 4) {
+      const colors = new Set(cards.map(c => c.color));
+      if (colors.size >= 4) {
+        const picked: Card[] = [];
+        const used = new Set<string>();
+        for (const c of cards) {
+          if (!used.has(c.color)) { picked.push(c); used.add(c.color); }
+        }
+        if (picked.length >= 4) {
+          results.push({ type: 'rainbow', cardIds: picked.slice(0, 4).map(c => c.id), label: `彩虹${picked[0].value}` });
+        }
+      }
+    }
+  }
+
+  // 顺子（同色3+连续数字）
+  for (const [, cards] of byColor) {
+    if (cards.length < 3) continue;
+    const nums = cards.map(c => ({ id: c.id, v: Number(c.value) })).filter(x => !isNaN(x.v)).sort((a, b) => a.v - b.v);
+    let start = 0;
+    for (let i = 1; i <= nums.length; i++) {
+      if (i < nums.length && nums[i].v === nums[i - 1].v + 1) continue;
+      if (i - start >= 3) {
+        results.push({
+          type: 'straight',
+          cardIds: nums.slice(start, i).map(x => x.id),
+          label: `顺子${nums[start].v}-${nums[i - 1].v}`,
+        });
+      }
+      start = i;
+    }
+  }
+
+  return results;
 }
 
 /**

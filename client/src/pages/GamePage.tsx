@@ -9,7 +9,6 @@ import { useGameStore } from '../store/gameStore';
 import { Card } from '../components/Card';
 import { PhaseTimer } from '../components/game/PhaseTimer';
 import { EmojiOverlay } from '../components/EmojiOverlay';
-import type { EmojiType } from '../components/EmojiOverlay';
 import type { Card as CardType } from '../../../shared/types';
 import { GAME_CONFIG } from '../config';
 
