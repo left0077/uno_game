@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react';
+import { useGameStore } from '../store/gameStore';
 import type { Room, Player } from '../../../shared/types';
 
 interface RoomPageProps {
@@ -36,8 +37,8 @@ export function RoomPage({
 }: RoomPageProps) {
   const [showAISettings, setShowAISettings] = useState(false);
   const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
+  const gameResult = useGameStore(s => s.gameResult);
 
-  // 从房间设置获取当前游戏模式
   const gameMode = room.settings?.mode || 'standard';
 
   const handleAddAI = () => {
@@ -169,6 +170,38 @@ export function RoomPage({
 
         {/* 右侧：房间信息和操作 */}
         <div className="space-y-4">
+          {/* 游戏结果 */}
+          {gameResult && gameResult.rankings && gameResult.rankings.length > 0 && (
+            <div className="casino-card p-6 mb-4 border-gold/50">
+              <h3 className="text-gold-light font-bold text-lg mb-4 text-center">
+                游戏结束
+              </h3>
+              <div className="space-y-2">
+                {gameResult.rankings.map((r: any, i: number) => (
+                  <div key={r.playerId} className={`flex items-center gap-3 p-3 rounded-xl ${
+                    i === 0 ? 'bg-gold/20 border border-gold/40' : 'bg-felt-dark/40'
+                  }`}>
+                    <span className={`text-lg font-bold w-8 text-center ${
+                      i === 0 ? 'text-gold' : i === 1 ? 'text-slate-300' : i === 2 ? 'text-amber-600' : 'text-cream-muted'
+                    }`}>
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                    </span>
+                    <span className="flex-1 font-medium text-cream">{r.nickname}</span>
+                    <span className="text-xs text-cream-muted">
+                      {r.status === 'eliminated' ? '淘汰' : r.status === 'winner' ? '🏆 冠军' : '完成'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => useGameStore.getState().setGameResult(null)}
+                className="w-full mt-4 py-2 text-cream-muted text-sm hover:text-cream transition-colors"
+              >
+                关闭
+              </button>
+            </div>
+          )}
+
           {/* 游戏设置 */}
           <div className="casino-card p-6">
             <h3 className="text-gold font-bold mb-4">游戏设置</h3>
