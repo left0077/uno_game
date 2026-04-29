@@ -59,8 +59,7 @@ export function useSocket(options: UseSocketOptions) {
       setIsConnected(true);
       setError(null);
       
-      // 发送身份验证
-      socket.emit('auth:register', { userId, nickname });
+      // SocketClient 已在 connect() 中发送 auth 事件，无需重复
     });
 
     const unsubDisconnect = socket.on('disconnect', (reason) => {

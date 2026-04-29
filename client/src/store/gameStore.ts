@@ -34,6 +34,10 @@ interface GameStore {
   myHand: Card[];
   setMyHand: (cards: Card[]) => void;
 
+  // 游戏结果
+  gameResult: { winnerId?: string; rankings?: any[] } | null;
+  setGameResult: (result: { winnerId?: string; rankings?: any[] } | null) => void;
+
   // UI 状态
   error: string;
   setError: (error: string) => void;
@@ -65,6 +69,7 @@ export const useGameStore = create<GameStore>()(
       room: null,
       inputRoomCode: '',
       gameState: null,
+      gameResult: null,
       myHand: [],
       error: '',
       cardSelectionOpen: false,
@@ -77,6 +82,7 @@ export const useGameStore = create<GameStore>()(
       setGameState: (state) => set({ gameState: state }),
       setMyHand: (cards) => set({ myHand: cards }),
       setError: (error) => set({ error }),
+      setGameResult: (result) => set({ gameResult: result }),
       setCardSelectionOpen: (open) => set({ cardSelectionOpen: open }),
 
       // 重置方法
@@ -84,12 +90,14 @@ export const useGameStore = create<GameStore>()(
         room: null,
         inputRoomCode: '',
         gameState: null,
+        gameResult: null,
         myHand: [],
         error: ''
       }),
 
       resetGameState: () => set({
         gameState: null,
+        gameResult: null,
         myHand: [],
         cardSelectionOpen: false
       }),

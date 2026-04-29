@@ -29,7 +29,10 @@ export interface SocketEvents {
   // 游戏事件
   'game:started': { roomCode: string; mode: string; players: Player[] };
   'game:state': GameState;
-  'game:ended': { winner: Player; rankings?: any[] };
+  'game:ended': { winnerId?: string; rankings?: any[] };
+
+  // 合并推送：手牌 + 可用动作
+  'player:turn': { playerId: string; cards: any[]; cardCount: number; actions: any[] };
 
   // 游戏内事件
   'player:hand': { playerId: string; cards: any[]; cardCount: number };
@@ -183,6 +186,7 @@ export class SocketClient {
     this.socket.on('game:ended', (data) => this.emitInternal('game:ended', data));
     
     // 玩家个人事件
+    this.socket.on('player:turn', (data) => this.emitInternal('player:turn', data));
     this.socket.on('player:hand', (data) => this.emitInternal('player:hand', data));
     this.socket.on('player:actions', (data) => this.emitInternal('player:actions', data));
 

@@ -636,25 +636,26 @@ export function setupSocketHandlers(io: Server): void {
 function broadcastGameStateV2(io: Server, roomCode: string, game: V2GameInstance): void {
   const state = serializeGameStateV2(game);
   io.to(roomCode).emit('game:state', state);
-  
-  // 为每个玩家单独发送其手牌
+
+  // 为每个玩家单独发送手牌 + 可用动作
   for (const playerId of game.state.tablePlayerIds) {
     const player = game.state.players.get(playerId);
-    if (player) {
-      // 找到玩家的 socket
-      const roomSockets = io.sockets.adapter.rooms.get(roomCode);
-      if (roomSockets) {
-        for (const socketId of roomSockets) {
-          const socket = io.sockets.sockets.get(socketId);
-          if (socket && socketUserMap.get(socketId) === playerId) {
-            socket.emit('player:hand', {
-              playerId,
-              cards: player.cards,
-              cardCount: player.cards.length
-            });
-            break;
-          }
-        }
+    if (!player) continue;
+
+    const roomSockets = io.sockets.adapter.rooms.get(roomCode);
+    if (!roomSockets) continue;
+
+    for (const socketId of roomSockets) {
+      const socket = io.sockets.sockets.get(socketId);
+      if (socket && socketUserMap.get(socketId) === playerId) {
+        // 合并推送：手牌 + 可用动作
+        socket.emit('player:turn', {
+          playerId,
+          cards: player.cards,
+          cardCount: player.cards.length,
+          actions: calculateAvailableActionsV2(game, playerId),
+        });
+        break;
       }
     }
   }

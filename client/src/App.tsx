@@ -84,10 +84,11 @@ function App() {
     store.resetRoomState();
   }, [store, handlePageChange]);
 
-  const handleGameEnded = useCallback(() => {
+  const handleGameEnded = useCallback((result: { winnerId?: string; rankings?: any[] }) => {
     setGameStarted(false);
+    store.setGameResult(result);
     handlePageChange('room');
-  }, [handlePageChange]);
+  }, [handlePageChange, store]);
 
   const handleGameState = useCallback((state: GameState) => {
     store.setGameState(state);
