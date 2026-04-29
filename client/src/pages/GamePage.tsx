@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Card } from '../components/Card';
+import { PhaseTimer } from '../components/game/PhaseTimer';
 import type { Card as CardType } from '../../../shared/types';
 import { GAME_CONFIG } from '../config';
 
@@ -98,6 +99,12 @@ export function GamePage({ gameActions, onLeaveRoom }: GamePageProps) {
         turnTimer={gameState.turnTimer}
         turnStartTime={gameState.turnStartTime}
         onLeaveRoom={onLeaveRoom}
+        phaseInfo={gameState.outState && gameState.gameStartTime ? {
+          gameStartTime: gameState.gameStartTime,
+          phaseTimes: (gameState as any).phaseTimes || [180, 360, 540],
+          currentPhase: gameState.outState.phase,
+          maxCards: gameState.outState.maxCards,
+        } : undefined}
       />
 
       {/* 游戏区域 - 柔和赌桌 */}
@@ -157,7 +164,8 @@ function GameHeader({
   isMyTurn,
   turnTimer,
   turnStartTime,
-  onLeaveRoom
+  onLeaveRoom,
+  phaseInfo,
 }: {
   roomCode: string;
   direction: number;
@@ -166,6 +174,12 @@ function GameHeader({
   turnTimer?: number;
   turnStartTime?: number;
   onLeaveRoom: () => void;
+  phaseInfo?: {
+    gameStartTime: number;
+    phaseTimes: number[];
+    currentPhase: number;
+    maxCards: number;
+  };
 }) {
   const [remainingTime, setRemainingTime] = useState(turnTimer || GAME_CONFIG.turnTimer);
 
@@ -192,7 +206,15 @@ function GameHeader({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between casino-card p-3 sm:p-4 gap-2 sm:gap-0">
+    <div className="casino-card p-3 sm:p-4 space-y-2">
+      {/* 阶段计时器（Out 模式） */}
+      {phaseInfo && (
+        <div className="flex justify-center">
+          <PhaseTimer {...phaseInfo} />
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
       {/* 第一行：房间号和方向 */}
       <div className="flex items-center gap-2 sm:gap-4">
         <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 bg-felt-dark/60 border border-gold/20 rounded-lg sm:rounded-xl">
@@ -235,6 +257,7 @@ function GameHeader({
       >
         离开
       </button>
+      </div>
     </div>
   );
 }

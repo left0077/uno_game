@@ -728,7 +728,11 @@ function serializeGameStateV2(game: V2GameInstance): any {
     
     // Out模式特有
     outState: state.outState,
-    
+
+    // 阶段计时
+    gameStartTime: state.gameStartTime,
+    phaseTimes: GAME_MODES.out.phases.map(p => p.at),
+
     // 元数据
     turnStartTime: state.turnStartTime,
     lastAction: state.lastAction
