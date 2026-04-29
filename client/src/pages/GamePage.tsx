@@ -36,6 +36,9 @@ export function GamePage({ gameActions, onLeaveRoom }: GamePageProps) {
   const gameState = store.gameState;
   const room = store.room;
   const isMyTurn = gameActions.isMyTurn();
+  const canPlay = gameActions.canPlay;
+  const hasPlayableCards = gameActions.myHand.some(c => canPlay(c.id));
+  const pendingDraw = gameState?.pendingDraw || 0;
 
   // 处理出牌
   const handlePlayCard = useCallback((cardId: string) => {
@@ -124,9 +127,14 @@ export function GamePage({ gameActions, onLeaveRoom }: GamePageProps) {
           <DrawPile onDraw={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} />
         </div>
 
-        {/* 当前颜色指示 */}
-        <div className="flex justify-center mb-6">
+        {/* 当前颜色指示 + 操作提示 */}
+        <div className="flex flex-col items-center gap-3 mb-6">
           <ColorIndicator color={gameState.currentColor} />
+          <TurnHint
+            isMyTurn={isMyTurn}
+            hasPlayableCards={hasPlayableCards}
+            pendingDraw={pendingDraw}
+          />
         </div>
 
         {/* 我的手牌 */}
@@ -479,6 +487,34 @@ function ColorPickerModal({
           取消
         </button>
       </div>
+    </div>
+  );
+}
+
+function TurnHint({ isMyTurn, hasPlayableCards, pendingDraw }: {
+  isMyTurn: boolean;
+  hasPlayableCards: boolean;
+  pendingDraw: number;
+}) {
+  if (!isMyTurn) return (
+    <div className="text-cream-muted/50 text-xs sm:text-sm">等待其他玩家操作...</div>
+  );
+  if (pendingDraw > 0) return (
+    <div className="flex items-center gap-2 px-4 py-1.5 bg-red-900/30 border border-red-500/40 rounded-full">
+      <span className="text-red-300 text-xs sm:text-sm font-bold animate-pulse">惩罚 +{pendingDraw}张</span>
+      <span className="text-cream-muted/70 text-xs">{hasPlayableCards ? '跟牌回避 或 摸牌接受' : '点击牌堆摸牌'}</span>
+    </div>
+  );
+  if (!hasPlayableCards) return (
+    <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-900/20 border border-amber-500/30 rounded-full">
+      <span className="text-amber-300 text-xs sm:text-sm">无牌可出</span>
+      <span className="text-cream-muted/70 text-xs">点击牌堆摸牌</span>
+    </div>
+  );
+  return (
+    <div className="flex items-center gap-2 px-4 py-1.5 bg-emerald-900/20 border border-emerald-500/30 rounded-full">
+      <span className="text-emerald-300 text-xs sm:text-sm font-medium">你的回合</span>
+      <span className="text-cream-muted/50 text-xs">点击卡牌出牌 或 摸牌</span>
     </div>
   );
 }
