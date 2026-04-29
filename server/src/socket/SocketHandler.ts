@@ -299,7 +299,6 @@ export function setupSocketHandlers(io: Server): void {
 
         // 启动游戏时钟（仅 Out 模式需要阶段推进和 AI 触发）
         if (data.mode === 'out') {
-        if (data.mode === 'out') {
           const clock = new GameClock(
             state,
             mode as OutModeV2,
