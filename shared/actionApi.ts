@@ -246,7 +246,7 @@ export interface DrawAction {
 export interface SpecialActions {
   callUno: ActionOption;
   challenge: ActionOption;
-  jumpIn: ActionOption;
+  jumpIn: ActionOption & { cardIds?: string[] };
 }
 
 // 玩家可执行的所有动作

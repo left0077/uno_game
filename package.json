@@ -15,10 +15,10 @@
     "test:e2e": "cd e2e && npm test",
     "test:e2e:headed": "cd e2e && npm run test:headed",
     "test:e2e:ui": "cd e2e && npm run test:ui",
-    "test:card": "cd server && node test-card.mjs",
-    "test:room": "cd server && node test-room.mjs",
-    "test:game": "cd server && node test-game.mjs",
-    "test:client": "cd client && npm run test:unit",
+    "test:card": "cd server && node tests/test-card.mjs",
+    "test:room": "cd server && node tests/test-room.mjs",
+    "test:game": "cd server && node tests/test-game.mjs",
+    "test:client": "cd server && tsx src/test/index.ts",
     "test:all": "npm run test && npm run test:e2e"
   },
   "devDependencies": {

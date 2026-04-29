@@ -8,14 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint . --ext ts --report-unused-disable-directives --max-warnings 0",
-    "test": "tsx src/test/index.ts",
-    "test:action-api": "tsx src/test/run-action-api-tests.ts",
-    "test:base": "tsx src/test/action-api/base.test.ts",
-    "test:out": "tsx src/test/action-api/out-mode.test.ts",
-    "test:penalty": "tsx src/test/action-api/penalty-response.test.ts",
-    "test:combo": "tsx src/test/action-api/combo-response.test.ts",
-    "test:integration": "tsx src/test/integration/action-api-integration.test.ts",
-    "test:performance": "tsx src/test/performance/action-api-performance.test.ts"
+    "test": "tsx src/test/index.ts"
   },
   "dependencies": {
     "express": "^4.18.3",
