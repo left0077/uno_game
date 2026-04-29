@@ -144,24 +144,30 @@ export class PlayerManager {
       this.state.phase = 'finished';
       return this.state.tablePlayerIds[0];
     }
-    
-    this.state.currentPlayerIndex = 
-      (this.state.currentPlayerIndex + this.state.direction + this.state.tablePlayerIds.length) 
-      % this.state.tablePlayerIds.length;
-    
-    const nextId = this.state.tablePlayerIds[this.state.currentPlayerIndex];
-    
-    // 清除上一玩家的UNO状态
-    const prevIndex = (this.state.currentPlayerIndex - this.state.direction + this.state.tablePlayerIds.length) 
-      % this.state.tablePlayerIds.length;
-    const prevId = this.state.tablePlayerIds[prevIndex];
+
+    // 清除上一玩家的 UNO 状态
+    const prevId = this.state.tablePlayerIds[this.state.currentPlayerIndex];
     const prevPlayer = this.state.players.get(prevId);
     if (prevPlayer) {
       prevPlayer.hasCalledUno = false;
     }
-    
+
+    // 推进到下一玩家
+    this.state.currentPlayerIndex =
+      (this.state.currentPlayerIndex + this.state.direction + this.state.tablePlayerIds.length)
+      % this.state.tablePlayerIds.length;
+
+    // 检查跳过效果：如果当前玩家被标记为跳过，再推进一次
+    const currentId = this.state.tablePlayerIds[this.state.currentPlayerIndex];
+    if (this.state.skippedPlayerId === currentId) {
+      this.state.skippedPlayerId = undefined; // 清除标记
+      this.state.currentPlayerIndex =
+        (this.state.currentPlayerIndex + this.state.direction + this.state.tablePlayerIds.length)
+        % this.state.tablePlayerIds.length;
+    }
+
     this.state.turnStartTime = Date.now();
-    return nextId;
+    return this.state.tablePlayerIds[this.state.currentPlayerIndex];
   }
 
   reverseDirection(): void {

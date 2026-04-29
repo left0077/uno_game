@@ -45,7 +45,8 @@ function createFinishedState(finishedIds: (string | null)[], eliminatedIds: stri
     deck: [],
     discardPile: [],
     currentColor: 'red',
-    turnStartTime: Date.now()
+    turnStartTime: Date.now(),
+    gameStartTime: Date.now()
   };
 }
 

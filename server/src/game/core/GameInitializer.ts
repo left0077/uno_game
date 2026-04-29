@@ -166,6 +166,7 @@ export class GameInitializer {
       pendingDrawType: oldState.pendingDrawType,
       skippedPlayerId: oldState.skippedPlayerId,
       turnStartTime: oldState.turnStartTime || Date.now(),
+      gameStartTime: oldState.gameStartTime || Date.now(),
       outState: oldState.outState
     };
   }

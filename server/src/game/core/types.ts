@@ -115,6 +115,15 @@ export interface ValidationResult {
   code?: string;
 }
 
+/** 动作执行结果 */
+export interface ActionResult {
+  success: boolean;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
 // ============================================================================
 // 游戏配置
 // ============================================================================

@@ -23,7 +23,7 @@ function createOutGameState(playerIds: string[]): GameStateV2 {
     const p = createMockPlayer(id, `P${index + 1}`);
     players.set(id, p);
   });
-  return { players, tablePlayerIds: [...playerIds], finishedPlayerIds: new Array(playerIds.length).fill(null), currentPlayerIndex: 0, direction: 1, phase: 'playing', deck: [], discardPile: [], currentColor: 'red', turnStartTime: Date.now() };
+  return { players, tablePlayerIds: [...playerIds], finishedPlayerIds: new Array(playerIds.length).fill(null), currentPlayerIndex: 0, direction: 1, phase: 'playing', deck: [], discardPile: [], currentColor: 'red', turnStartTime: Date.now(), gameStartTime: Date.now() };
 }
 
 console.log('🧪 OutModeV2 测试 (规则 v2.1)\n');

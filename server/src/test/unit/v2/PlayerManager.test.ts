@@ -44,7 +44,8 @@ function createMockState(playerIds: string[]): GameStateV2 {
     deck: [],
     discardPile: [],
     currentColor: 'red',
-    turnStartTime: Date.now()
+    turnStartTime: Date.now(),
+    gameStartTime: Date.now()
   };
 }
 

@@ -8,11 +8,12 @@
  */
 
 import { Card, Player } from '../../shared/index.js';
-import { 
-  GameStateV2, 
-  GameActionV2, 
+import {
+  GameStateV2,
+  GameActionV2,
   ValidationResult,
-  GameConfig 
+  ActionResult,
+  GameConfig
 } from './types.js';
 import { PlayerManager } from './PlayerManager.js';
 
@@ -65,27 +66,27 @@ export abstract class BaseGameModeV2 {
   
   /**
    * 处理玩家动作
-   * @returns 是否成功
    */
-  handleAction(action: GameActionV2): boolean {
-    // 1. 验证动作
+  handleAction(action: GameActionV2): ActionResult {
     const validation = this.validateAction(action);
     if (!validation.valid) {
       console.warn(`[BaseGameModeV2] 非法动作: ${validation.error}`);
-      return false;
+      return {
+        success: false,
+        error: { code: validation.code || 'INVALID_ACTION', message: validation.error || '非法动作' }
+      };
     }
-    
-    // 2. 执行动作
+
     try {
       this.executeAction(action);
-      
-      // 3. 记录最后动作
       this.state.lastAction = { ...action, timestamp: Date.now() };
-      
-      return true;
+      return { success: true };
     } catch (error) {
       console.error('[BaseGameModeV2] 执行动作失败:', error);
-      return false;
+      return {
+        success: false,
+        error: { code: 'EXECUTION_FAILED', message: '执行动作时发生错误' }
+      };
     }
   }
   
@@ -204,6 +205,21 @@ export abstract class BaseGameModeV2 {
   }
   
   protected validateChallenge(action: GameActionV2): ValidationResult {
+    const { targetId } = action;
+    if (!targetId) {
+      return { valid: false, error: 'No target specified' };
+    }
+    const target = this.state.players.get(targetId);
+    if (!target) {
+      return { valid: false, error: 'Target not found' };
+    }
+    // 目标必须只有 1 张牌且未喊 UNO
+    if (target.cards.length !== 1) {
+      return { valid: false, error: 'Target must have exactly 1 card' };
+    }
+    if (target.hasCalledUno) {
+      return { valid: false, error: 'Target already called UNO' };
+    }
     return { valid: true };
   }
   
@@ -292,13 +308,16 @@ export abstract class BaseGameModeV2 {
    */
   protected executeDraw(action: GameActionV2): void {
     const player = this.state.players.get(action.playerId)!;
-    
-    // 摸牌
-    this.drawCardsForPlayer(action.playerId, 1);
-    
-    // 清除UNO状态
+
+    // 摸牌：有累积惩罚时摸满，否则摸 1 张
+    const drawCount = this.state.pendingDraw || 1;
+    this.drawCardsForPlayer(action.playerId, drawCount);
+    this.state.pendingDraw = 0;
+    this.state.pendingDrawType = undefined;
+
+    // 清除 UNO 状态
     player.hasCalledUno = false;
-    
+
     // 流转回合
     this.playerManager.nextTurn();
   }
@@ -427,6 +446,9 @@ export abstract class BaseGameModeV2 {
         break;
       case 'draw2':
       case 'draw4':
+      case 'draw3':
+      case 'draw5':
+      case 'draw8':
         this.applyDrawEffect(card.type);
         break;
     }
@@ -451,11 +473,10 @@ export abstract class BaseGameModeV2 {
     }
   }
   
-  protected applyDrawEffect(type: 'draw2' | 'draw4'): void {
-    if (!this.state.pendingDraw) {
-      this.state.pendingDraw = type === 'draw2' ? 2 : 4;
-      this.state.pendingDrawType = type;
-    }
+  protected applyDrawEffect(type: 'draw2' | 'draw4' | 'draw3' | 'draw5' | 'draw8'): void {
+    const amount = parseInt(type.replace('draw', ''), 10);
+    this.state.pendingDraw = (this.state.pendingDraw || 0) + amount;
+    this.state.pendingDrawType = type;
   }
   
   // ============================================================================

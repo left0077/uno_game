@@ -337,20 +337,17 @@ export function setupSocketHandlers(io: Server): void {
         timestamp: Date.now()
       };
 
-      const success = game.mode.handleAction(action);
-      
-      if (success) {
-        // 广播新状态
+      const result = game.mode.handleAction(action);
+
+      if (result.success) {
         broadcastGameStateV2(io, data.roomCode, game);
-        
-        // 检查游戏结束
         if (game.state.phase === 'finished') {
           handleGameEndV2(io, data.roomCode, game);
         }
       } else {
-        socket.emit(SocketEvents.ERROR, { 
+        socket.emit(SocketEvents.ERROR, {
           action: data.action,
-          reason: 'INVALID_ACTION'
+          ...result.error
         });
       }
     });
