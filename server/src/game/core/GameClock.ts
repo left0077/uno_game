@@ -23,7 +23,7 @@ export class GameClock {
   private turnTimer: number;
   private globalTimeout: number;
   private tickCount = 0;
-  private aiScheduled = false;
+  private lastScheduledAI: string | null = null;
 
   constructor(
     private state: GameStateV2,
@@ -89,15 +89,15 @@ export class GameClock {
     const player = this.state.players.get(currentId);
     if (!player) return;
 
-    // 非 AI 回合时重置标志
+    // 非 AI 回合时清除记录
     if (!player.isAI) {
-      this.aiScheduled = false;
+      this.lastScheduledAI = null;
       return;
     }
 
-    // AI 回合（防重复调度）
-    if (!this.aiScheduled) {
-      this.aiScheduled = true;
+    // AI 回合：防止对同一玩家重复调度（允许不同 AI 连续调度）
+    if (this.lastScheduledAI !== currentId) {
+      this.lastScheduledAI = currentId;
       this.callbacks.onAITurn(currentId);
     }
   }
