@@ -58,7 +58,7 @@ export interface RoomSettings {
 export interface OutState {
   phase: 0 | 1 | 2 | 3; // 0=正常, 1-3=Out阶段
   maxCards: number; // 当前手牌上限（超出淘汰）
-  nextOutAt: number; // 下次Out时间戳
+  nextOutAt?: number; // 下阶段阈值（旧字段，保留兼容）
 }
 
 // 游戏状态

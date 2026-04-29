@@ -1,65 +1,32 @@
 /**
- * OutModeV2 - Out模式实现（重构版）
- * 
+ * OutModeV2 — 大逃杀模式（规则书 v2.1）
+ *
  * 核心特性：
- * 1. 连打出牌（对子/三连/彩虹/顺子）
- * 2. 手牌上限惩罚机制
- * 3. 逐步淘汰系统
+ * 1. 连打出牌（对子/三连/彩虹/顺子），不产生惩罚卡
+ * 2. 固定手牌上限 20，超出淘汰
+ * 3. 阶段由 GameClock 时间触发（3/6/9 分钟），注入惩罚卡
+ * 4. 惩罚卡跨类型叠加 + 反转弹回
  */
 
 import { Card } from '../../shared/index.js';
-import { 
-  GameStateV2, 
-  GameActionV2, 
-  ValidationResult 
-} from './types.js';
+import { GameStateV2, GameActionV2, ValidationResult } from './types.js';
 import { BaseGameModeV2 } from './BaseGameModeV2.js';
 
 export interface OutState {
-  phase: 0 | 1 | 2 | 3;     // 当前阶段
-  maxCards: number;          // 当前手牌上限
-  nextOutAt: number;         // 下阶段触发阈值
+  phase: 0 | 1 | 2 | 3;
+  maxCards: number;
 }
 
 export class OutModeV2 extends BaseGameModeV2 {
   readonly name = 'out';
   readonly description = 'Out模式：连打出牌，手牌超限即淘汰，最后存活者胜';
-  
-  // Out模式配置
-  protected config = {
-    cardsPerPlayer: 7,
-    turnTimer: 120,
-    allowStacking: true,
-    allowJumpIn: true
-  };
-  
-  // 阶段配置（规则书 v2.1：固定上限 20，时间触发 3/6/9 分钟）
-  private static readonly PHASE_CONFIG = [
-    { maxCards: 20, nextOutAt: 0 },
-    { maxCards: 20, nextOutAt: 0 },
-    { maxCards: 20, nextOutAt: 0 },
-    { maxCards: 20, nextOutAt: 0 },
-  ];
-
-  // 连打效果（规则书 v2.1：连打不产生惩罚卡，只有战术效果）
-  // 对子: 无效果 | 三条: 下家跳过 | 彩虹: 目标+3 | 顺子: 下家 N-2
-  private static readonly COMBO_EFFECT = {
-    pair: { skip: false, draw: 0 },
-    three: { skip: true, draw: 0 },
-    rainbow: { skip: false, draw: 3 },
-    straight: {},  // draw = N - 2，动态计算
-  };
 
   // ============================================================================
   // 初始化
   // ============================================================================
-  
+
   protected onInitialize(): void {
-    this.state.outState = {
-      phase: 0,
-      maxCards: 20,
-      nextOutAt: 0,
-    };
+    this.state.outState = { phase: 0, maxCards: 20 };
     console.log(`[OutModeV2] 初始化完成，阶段0，手牌上限20`);
   }
 
@@ -67,146 +34,85 @@ export class OutModeV2 extends BaseGameModeV2 {
   // 动作验证
   // ============================================================================
 
-  /**
-   * 验证连打出牌
-   */
   protected validateCombo(action: GameActionV2): ValidationResult {
     const { playerId, cardIds, comboType } = action;
-    
+
+    // 检查回合
+    if (this.playerManager.getCurrentPlayerId() !== playerId) {
+      return { valid: false, error: 'Not your turn' };
+    }
+
     if (!cardIds || cardIds.length < 2) {
       return { valid: false, error: '连打至少需要2张牌' };
     }
-    
     if (!comboType) {
       return { valid: false, error: '需要指定连打类型' };
     }
-    
+
     const player = this.state.players.get(playerId);
     if (!player) {
       return { valid: false, error: '玩家不存在' };
     }
-    
-    // 验证玩家拥有这些牌
+
+    // 验证拥有这些牌
     const cards: Card[] = [];
     for (const cardId of cardIds) {
       const card = player.cards.find(c => c.id === cardId);
-      if (!card) {
-        return { valid: false, error: `玩家没有牌 ${cardId}` };
-      }
+      if (!card) return { valid: false, error: `玩家没有牌 ${cardId}` };
       cards.push(card);
     }
-    
-    // 验证连打规则
+
+    // 分派到具体验证
     switch (comboType) {
-      case 'pair':
-        return this.validatePair(cards);
-      case 'three':
-        return this.validateThree(cards);
-      case 'rainbow':
-        return this.validateRainbow(cards);
-      case 'straight':
-        return this.validateStraight(cards);
-      default:
-        return { valid: false, error: `未知的连打类型: ${comboType}` };
+      case 'pair': return this.validatePair(cards);
+      case 'three': return this.validateThree(cards);
+      case 'rainbow': return this.validateRainbow(cards);
+      case 'straight': return this.validateStraight(cards);
+      default: return { valid: false, error: `未知的连打类型: ${comboType}` };
     }
   }
 
-  /**
-   * 验证对子（相同颜色或相同数字）
-   */
   private validatePair(cards: Card[]): ValidationResult {
-    if (cards.length !== 2) {
-      return { valid: false, error: '对子需要2张牌' };
-    }
-    
+    if (cards.length !== 2) return { valid: false, error: '对子需要2张牌' };
+    if (cards.some(c => c.type === 'wild' || c.type === 'draw4'))
+      return { valid: false, error: '万能牌不能参与连打' };
     const [c1, c2] = cards;
-    
-    // 万能牌不能参与连打
-    if (c1.type === 'wild' || c1.type === 'draw4' || 
-        c2.type === 'wild' || c2.type === 'draw4') {
-      return { valid: false, error: '万能牌不能参与连打' };
-    }
-    
-    // 同色或同值
-    const sameColor = c1.color === c2.color;
-    const sameValue = c1.value === c2.value;
-    
-    if (!sameColor && !sameValue) {
+    if (c1.color !== c2.color && c1.value !== c2.value)
       return { valid: false, error: '对子需要同色或同值' };
-    }
-    
     return { valid: true };
   }
 
-  /**
-   * 验证三连（三张同色）
-   */
   private validateThree(cards: Card[]): ValidationResult {
-    if (cards.length !== 3) {
-      return { valid: false, error: '三连需要3张牌' };
-    }
-    
-    // 不能包含万能牌
-    if (cards.some(c => c.type === 'wild' || c.type === 'draw4')) {
+    if (cards.length !== 3) return { valid: false, error: '三连需要3张牌' };
+    if (cards.some(c => c.type === 'wild' || c.type === 'draw4'))
       return { valid: false, error: '万能牌不能参与连打' };
-    }
-    
-    // 同色
     const color = cards[0].color;
-    if (!cards.every(c => c.color === color)) {
+    if (!cards.every(c => c.color === color))
       return { valid: false, error: '三连需要同色' };
-    }
-    
     return { valid: true };
   }
 
-  /**
-   * 验证彩虹（四色各一张）
-   */
   private validateRainbow(cards: Card[]): ValidationResult {
-    if (cards.length !== 4) {
-      return { valid: false, error: '彩虹需要4张牌' };
-    }
-    
-    // 不能包含万能牌
-    if (cards.some(c => c.type === 'wild' || c.type === 'draw4')) {
+    if (cards.length !== 4) return { valid: false, error: '彩虹需要4张牌' };
+    if (cards.some(c => c.type === 'wild' || c.type === 'draw4'))
       return { valid: false, error: '万能牌不能参与连打' };
-    }
-    
-    // 四种不同颜色
-    const colors = new Set(cards.map(c => c.color));
-    if (colors.size !== 4) {
+    if (new Set(cards.map(c => c.color)).size !== 4)
       return { valid: false, error: '彩虹需要四种不同颜色' };
-    }
-    
     return { valid: true };
   }
 
-  /**
-   * 验证顺子（三张连续数字）
-   */
   private validateStraight(cards: Card[]): ValidationResult {
-    if (cards.length !== 3) {
-      return { valid: false, error: '顺子需要3张牌' };
-    }
-    
-    // 不能包含万能牌
-    if (cards.some(c => c.type === 'wild' || c.type === 'draw4')) {
+    if (cards.length < 3) return { valid: false, error: '顺子至少需要3张牌' };
+    if (cards.some(c => c.type === 'wild' || c.type === 'draw4'))
       return { valid: false, error: '万能牌不能参与连打' };
-    }
-    
-    // 同色
     const color = cards[0].color;
-    if (!cards.every(c => c.color === color)) {
+    if (!cards.every(c => c.color === color))
       return { valid: false, error: '顺子需要同色' };
-    }
-    
-    // 连续数字
     const values = cards.map(c => Number(c.value)).sort((a, b) => a - b);
-    if (values[1] !== values[0] + 1 || values[2] !== values[1] + 1) {
-      return { valid: false, error: '顺子需要连续数字' };
+    for (let i = 1; i < values.length; i++) {
+      if (values[i] !== values[i - 1] + 1)
+        return { valid: false, error: '顺子需要连续数字' };
     }
-    
     return { valid: true };
   }
 
@@ -214,164 +120,59 @@ export class OutModeV2 extends BaseGameModeV2 {
   // 动作执行
   // ============================================================================
 
-  /**
-   * 执行连打出牌
-   */
   protected executeCombo(action: GameActionV2): void {
     const { playerId, cardIds, comboType, chosenColor } = action;
     const player = this.state.players.get(playerId)!;
-    
+
     // 移除手牌
     const cards: Card[] = [];
     for (const cardId of cardIds!) {
       const index = player.cards.findIndex(c => c.id === cardId);
-      const card = player.cards.splice(index, 1)[0];
-      cards.push(card);
-      this.state.discardPile.push(card);
+      cards.push(player.cards.splice(index, 1)[0]);
+      this.state.discardPile.push(cards[cards.length - 1]);
     }
-    
-    // 设置颜色（最后一张牌的颜色，如果是wild则使用chosenColor）
-    const lastCard = cards[cards.length - 1];
-    if (lastCard.type === 'wild' || lastCard.type === 'draw4') {
-      this.state.currentColor = chosenColor || 'red';
-    } else {
-      this.state.currentColor = lastCard.color;
-    }
-    
     player.cardCount = player.cards.length;
-    
-    console.log(`[OutModeV2] 玩家 ${player.nickname} 连打 ${comboType}: ${cardIds!.length}张牌`);
-    
-    // 检查是否出完牌
+
+    // 设置颜色（最后一张牌的颜色）
+    const lastCard = cards[cards.length - 1];
+    this.state.currentColor =
+      lastCard.type === 'wild' || lastCard.type === 'draw4'
+        ? chosenColor || 'red'
+        : lastCard.color;
+
+    console.log(`[OutModeV2] ${player.nickname} 连打 ${comboType}: ${cardIds!.length}张`);
+
+    // 出完牌 → 完成
     if (player.cards.length === 0) {
       this.playerManager.playerFinished(playerId);
-      this.checkPhaseProgression();
       return;
     }
-    
-    // 应用连打效果（替代旧 COMBO_PENALTY）
+
+    // 应用连打效果
     this.applyComboEffect(comboType!, cardIds!.length);
 
     // 流转回合
     this.playerManager.nextTurn();
   }
 
-  /**
-   * 应用连打效果（规则书 v2.1：连打不产生惩罚卡，只有战术效果）
-   */
   private applyComboEffect(comboType: string, straightLength?: number): void {
-    if (comboType === 'pair') {
-      // 对子：无效果
-      return;
-    }
-    if (comboType === 'three') {
-      // 三条：下家跳过
-      const nextId = this.playerManager.getNextPlayerId();
-      if (nextId) this.state.skippedPlayerId = nextId;
-      return;
-    }
-    if (comboType === 'rainbow') {
-      // 彩虹：目标摸 +3
-      this.state.pendingDraw = (this.state.pendingDraw || 0) + 3;
-      return;
-    }
-    if (comboType === 'straight') {
-      // 顺子：下家摸 N-2 张
-      const n = straightLength || 3;
-      this.state.pendingDraw = (this.state.pendingDraw || 0) + (n - 2);
-      return;
-    }
-  }
-
-  /**
-   * 执行摸牌（覆盖以检查手牌上限）
-   */
-  protected executeDraw(action: GameActionV2): void {
-    super.executeDraw(action);
-    
-    // 检查手牌上限
-    this.checkHandLimit(action.playerId);
-  }
-
-  /**
-   * 检查手牌上限并执行淘汰
-   */
-  private checkHandLimit(playerId: string): void {
-    const player = this.state.players.get(playerId);
-    if (!player) return;
-    
-    const outState = this.state.outState!;
-    
-    if (player.cards.length > outState.maxCards) {
-      console.log(`[OutModeV2] 玩家 ${player.nickname} 手牌${player.cards.length}张，超过上限${outState.maxCards}，被淘汰！`);
-      this.playerManager.playerEliminated(playerId);
-      
-      // 检查阶段推进
-      this.checkPhaseProgression();
-    }
-  }
-
-  /**
-   * 检查是否推进阶段
-   * 当有玩家手牌 ≤ nextOutAt 时，进入下一阶段
-   */
-  // 阶段推进由 GameClock 基于时间触发（Phase 4 实现）
-  private checkPhaseProgression(): void {
-    return; // 暂时停用手牌数触发，等 GameClock 接管
-  }
-
-  private _checkPhaseProgressionOld(): void {
-    if (!this.state.outState) return;
-
-    const currentPhase = this.state.outState.phase;
-    if (currentPhase >= 3) return; // 最后阶段
-    
-    // 检查是否有玩家手牌达到阈值
-    const threshold = this.state.outState.nextOutAt;
-    let shouldProgress = false;
-    
-    for (const playerId of this.state.tablePlayerIds) {
-      const player = this.state.players.get(playerId);
-      if (player && player.cards.length <= threshold) {
-        shouldProgress = true;
+    switch (comboType) {
+      case 'pair':
+        break; // 对子：无效果
+      case 'three': {
+        // 三条：下家跳过
+        const nextId = this.playerManager.getNextPlayerId();
+        if (nextId) this.state.skippedPlayerId = nextId;
         break;
       }
-    }
-    
-    // 检查已结束玩家
-    for (const playerId of this.state.finishedPlayerIds) {
-      if (playerId === null) continue;
-      const player = this.state.players.get(playerId);
-      if (player && player.cards.length <= threshold) {
-        shouldProgress = true;
+      case 'rainbow':
+        // 彩虹：目标摸 +3
+        this.state.pendingDraw = (this.state.pendingDraw || 0) + 3;
         break;
-      }
-    }
-    
-    if (shouldProgress) {
-      this.progressPhase();
-    }
-  }
-
-  /**
-   * 推进到下一阶段
-   */
-  private progressPhase(): void {
-    const currentPhase = this.state.outState!.phase;
-    const nextPhase = (currentPhase + 1) as 0 | 1 | 2 | 3;
-    
-    const config = OutModeV2.PHASE_CONFIG[nextPhase];
-    this.state.outState = {
-      phase: nextPhase,
-      maxCards: config.maxCards,
-      nextOutAt: config.nextOutAt
-    };
-    
-    console.log(`[OutModeV2] 进入阶段${nextPhase}！手牌上限${config.maxCards}，下阶段阈值${config.nextOutAt}`);
-    
-    // 检查是否有玩家因阶段推进而超限
-    for (const playerId of [...this.state.tablePlayerIds]) {
-      this.checkHandLimit(playerId);
+      case 'straight':
+        // 顺子：下家摸 N-2 张
+        this.state.pendingDraw = (this.state.pendingDraw || 0) + ((straightLength || 3) - 2);
+        break;
     }
   }
 
@@ -379,21 +180,36 @@ export class OutModeV2 extends BaseGameModeV2 {
   // 覆盖父类方法
   // ============================================================================
 
-  /**
-   * 覆盖出牌后的检查
-   */
-  protected onPlayerFinished(playerId: string): void {
-    this.playerManager.playerFinished(playerId);
-    this.checkPhaseProgression();
+  protected executeDraw(action: GameActionV2): void {
+    super.executeDraw(action);
+    this.checkHandLimit(action.playerId);
   }
 
-  /**
-   * 覆盖惩罚牌处理
-   */
-  protected applyDrawEffect(type: 'draw2' | 'draw4'): void {
-    if (!this.state.pendingDraw) {
-      this.state.pendingDraw = type === 'draw2' ? 2 : 4;
-      this.state.pendingDrawType = type;
+  protected onPlayerFinished(playerId: string): void {
+    this.playerManager.playerFinished(playerId);
+  }
+
+  // ============================================================================
+  // 手牌上限与淘汰
+  // ============================================================================
+
+  private checkHandLimit(playerId: string): void {
+    const player = this.state.players.get(playerId);
+    if (!player) return;
+    if (player.cards.length > (this.state.outState?.maxCards ?? 20)) {
+      console.log(`[OutModeV2] ${player.nickname} 手牌${player.cards.length}张，超上限，淘汰！`);
+      this.playerManager.playerEliminated(playerId);
+    }
+  }
+
+  /** 由 GameClock 调用，推进阶段并注入惩罚卡 */
+  advancePhase(newPhase: number): void {
+    if (!this.state.outState) return;
+    this.state.outState.phase = newPhase as 0 | 1 | 2 | 3;
+    console.log(`[OutModeV2] 进入阶段${newPhase}！`);
+    // 阶段推进后检查所有在场玩家是否超限
+    for (const playerId of [...this.state.tablePlayerIds]) {
+      this.checkHandLimit(playerId);
     }
   }
 }

@@ -72,7 +72,6 @@ export interface GameStateV2 {
   outState?: {
     phase: 0 | 1 | 2 | 3;
     maxCards: number;
-    nextOutAt: number;
   };
 }
 
