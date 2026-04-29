@@ -1,100 +1,75 @@
 # UNO Online
 
-> 🎮 在线 UNO 游戏，支持 2-8 人实时对战
-
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-18%2B-61dafb)](https://react.dev/)
-[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.0%2B-black)](https://socket.io/)
+> 在线 UNO 卡牌游戏，支持 2-8 人实时对战，含 Out 大逃杀模式
 
 ---
 
-## 🚀 快速开始
+## 快速开始
 
 ```bash
-# 安装依赖
 npm install
-
-# 启动开发环境
 npm run dev
 ```
 
-访问 http://localhost:3000/uno/ 开始游戏
+- 前端 http://localhost:3000/uno/
+- 后端 http://localhost:3001/health
 
 ---
 
-## 📂 项目结构
+## 项目结构
 
 ```
 uno/
-├── client/           # 前端 (React + Vite)
-│   ├── src/
-│   │   ├── pages/    # 页面组件
-│   │   ├── hooks/    # React Hooks
-│   │   └── core/     # 核心逻辑
-│   └── dist/         # 构建输出
-│
+├── client/           # 前端 (React + Vite + Tailwind)
+│   └── src/
+│       ├── core/     # 服务单例层（无 React 依赖）
+│       ├── hooks/    # React 桥接
+│       ├── pages/    # HomePage / RoomPage / GamePage
+│       ├── components/  # Card, EmojiOverlay, game/
+│       └── store/    # Zustand 状态管理
 ├── server/           # 后端 (Node.js + Socket.IO)
 │   └── src/
-│       ├── game/     # 游戏逻辑
-│       ├── socket/   # Socket 处理器
-│       └── test/     # 单元测试
-│
+│       ├── game/core/   # BaseGameModeV2, OutModeV2, PlayerManager, GameClock
+│       ├── game/ai/     # AI 三级策略
+│       ├── socket/      # SocketHandler
+│       ├── rooms/       # RoomManager
+│       └── config/      # gameConfig.ts
+├── shared/           # 共享类型（前后端统一）
 ├── e2e/              # E2E 测试 (Playwright)
-│   └── tests/        # 测试文件
-│
-└── shared/           # 共享类型定义
+└── docs/             # 文档中心
 ```
 
 ---
 
-## 🛠️ 技术栈
+## 两个游戏模式
 
-| 层级 | 技术 |
-|------|------|
-| 前端 | React 18 + TypeScript + Vite + Tailwind CSS |
-| 后端 | Node.js + Express + Socket.IO |
-| 测试 | Playwright E2E + 后端单元测试 |
-
----
-
-## ✅ 当前状态
-
-### 已完成
-- ✅ Socket 事件命名标准化 (`domain:action` 格式)
-- ✅ E2E 测试基础功能全部通过 (11/11)
-- ✅ 后端单元测试全部通过
-- ✅ 前后端构建通过
-
-### Socket 事件规范
-```typescript
-// 房间管理
-room:create, room:join, room:leave
-room:settings, room:start
-
-// 游戏操作
-game:play, game:combo, game:draw
-game:uno, game:challenge
-
-// AI 管理
-ai:add, ai:remove
-
-// 玩家操作
-player:host, player:actions
-
-// 聊天
-chat:send, chat:message
-```
-
-详见 `server/src/shared/index.ts` 中的 `SocketEvents` 枚举。
+| | Standard | Out |
+|---|---------|-----|
+| 规则 | 经典 UNO | 连打 + 淘汰 |
+| 手牌上限 | 无 | 20 张 |
+| 惩罚卡 | +2, +4 | +2, +3, +4, +5, +8 |
+| 连打 | 无 | 对子/三条/彩虹/顺子 |
+| 阶段 | 无 | 3/6/9 分钟注入惩罚卡 |
+| AI | ✅ | ✅ |
 
 ---
 
-## 🧪 测试
+## 核心设计
+
+- **服务端权威**：所有规则由服务端计算，客户端只展示
+- **策略模式**：`BaseGameModeV2` 定义流程，子类覆写差异
+- **游戏时钟**：`GameClock` 每秒 tick 驱动 AI 回合和阶段推进
+- **双层推送**：`game:state` 公开广播 + `player:turn` 私密推送
+
+详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+---
+
+## 测试
 
 ```bash
-# 运行所有测试
-npm test
+# 服务端单元测试
+cd server && npx tsx src/test/index.ts
 
 # E2E 测试
 cd e2e && npx playwright test
@@ -102,15 +77,12 @@ cd e2e && npx playwright test
 
 ---
 
-## 📖 文档
+## 文档
 
-- `docs/rules/` - 游戏规则说明
-- `docs/architecture/` - 架构设计文档
-- `.kimi/workflow.md` - 开发工作流指南
+- [架构文档](docs/ARCHITECTURE.md)
+- [规则书](docs/rules/)
+- [实施计划](docs/IMPLEMENTATION_PLAN.md)
 
 ---
 
-## 📝 项目状态
-
-**最后更新**: 2026-03-19
-**状态**: 核心功能稳定，E2E 测试通过
+*最后更新：2026-04-30*

@@ -4,6 +4,34 @@
 
 ---
 
+## 核心设计原则
+
+**1. 服务端权威（Server-Authoritative）**
+
+所有游戏规则由服务端计算，客户端只负责展示和交互。客户端不实现任何游戏逻辑。
+
+- 哪些牌可以出 → 服务端计算，推送到 `player:turn.actions`
+- 哪些连打可以组 → 服务端 `detectCombos` 计算，推送到 `player:turn.actions`
+- 惩罚响应选项 → 服务端计算，推送到 `player:turn.actions`
+- 验证规则 → 服务端 `BaseGameModeV2.validateAction` 执行
+
+客户端唯一的"判断"是检查服务端已推送的 `availableActions` 数组中是否存在对应项，
+这是数据读取而非规则逻辑。
+
+**2. 策略模式（Template Method Pattern）**
+
+`BaseGameModeV2` 定义 `validateAction → executeAction` 流程，子类覆写差异方法。
+
+**3. 事件驱动 + 游戏时钟**
+
+`SocketHandler` 处理玩家动作事件，`GameClock` 每秒 tick 驱动 AI 回合和阶段推进。
+
+**4. 双层推送**
+
+`game:state`（公开信息）广播全房间，`player:turn`（手牌+可用动作）私密推送给对应玩家。
+
+---
+
 ## 一、整体架构
 
 ```

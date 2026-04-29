@@ -42,6 +42,12 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   const canPlay = gameActions.canPlay;
   const hasPlayableCards = gameActions.myHand.some(c => canPlay(c.id));
   const pendingDraw = gameState?.pendingDraw || 0;
+  const comboOptions = gameActions.comboOptions || [];
+  const penaltyInfo = gameActions.penaltyInfo;
+
+  const handlePlayCombo = useCallback((cardIds: string[], comboType: string) => {
+    gameActions.playCombo(cardIds, comboType as any);
+  }, [gameActions]);
 
   // 处理出牌
   const handlePlayCard = useCallback((cardId: string) => {

@@ -5,14 +5,14 @@
 | 文档 | 说明 |
 |------|------|
 | [API_DESIGN.md](./API_DESIGN.md) | Action API v2.0 详细设计 |
-| [FEATURE_PLAN.md](./FEATURE_PLAN.md) | 功能规划清单 |
-| [FEATURE_CHECKLIST.md](./FEATURE_CHECKLIST.md) | 功能完成度核对 |
 | [HARDCODED_VALUES.md](./HARDCODED_VALUES.md) | 硬编码值提取记录 |
-| [TEST_PLAN.md](./TEST_PLAN.md) | 测试计划 |
 
-## 已归档
+## 已移至根文档目录
 
-架构设计文档已统一到 [../ARCHITECTURE.md](../ARCHITECTURE.md)。旧方案文档移至 `_archive/`。
+- 架构文档 → [../ARCHITECTURE.md](../ARCHITECTURE.md)
+- 测试计划 → [../TEST_PLAN.md](../TEST_PLAN.md)
+- 实施计划 → [../IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md)
+- 功能清单 → 已归档 `_archive/`
 
 ---
 
