@@ -25,6 +25,8 @@ interface GamePageProps {
     requiresColorSelection: (cardId: string) => boolean;
     isMyTurn: () => boolean;
     myHand: CardType[];
+    comboOptions: Array<{ type: string; comboType: string; cardIds: string[]; label: string }>;
+    penaltyInfo: { pendingDraw: number; penaltySourceId: string } | null;
   };
   emojiMessages?: Array<{ playerId: string; emoji: string; target?: string; timestamp: number }>;
   onDismissEmoji?: () => void;
@@ -153,6 +155,23 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
           onPlayCard={handlePlayCard}
           canPlay={gameActions.canPlay}
         />
+
+        {/* 连打选项 */}
+        {comboOptions.length > 0 && isMyTurn && (
+          <div className="flex justify-center gap-2 flex-wrap mt-4">
+            {comboOptions.map((combo, i) => (
+              <button
+                key={i}
+                onClick={() => handlePlayCombo(combo.cardIds, combo.comboType)}
+                className="px-4 py-2 bg-purple-900/40 border border-purple-500/40 rounded-xl
+                  text-purple-200 text-sm font-medium hover:bg-purple-800/50
+                  hover:border-purple-400/60 transition-all"
+              >
+                {combo.label} ({combo.cardIds.length}张)
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* 操作按钮 */}
         <GameControls

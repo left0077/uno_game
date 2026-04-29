@@ -146,6 +146,16 @@ export function useGameActions() {
     gameService.executeAction({ type: 'jump', payload: { surrender: true } });
   }, [gameService]);
 
+  // 从服务端推送的可用动作中提取连打和惩罚信息
+  const comboOptions = useMemo(() =>
+    availableActions.filter(a => a.type === 'combo'),
+    [availableActions]
+  );
+  const penaltyInfo = useMemo(() =>
+    availableActions.find(a => a.type === 'penalty_info') || null,
+    [availableActions]
+  );
+
   return {
     // 动作方法
     playCard,
@@ -155,14 +165,18 @@ export function useGameActions() {
     challengePlayer,
     setJump,
     surrender,
-    
+
     // 验证方法
     canPlay: engine.canPlayCard.bind(engine),
     canDraw: engine.canDraw.bind(engine),
     canCallUno: engine.canCallUno.bind(engine),
     canChallenge: engine.canChallenge.bind(engine),
     requiresColorSelection: engine.requiresColorSelection.bind(engine),
-    
+
+    // 服务端推送的选项
+    comboOptions,
+    penaltyInfo,
+
     // 状态
     isMyTurn: engine.isMyTurn.bind(engine),
     availableActions,
