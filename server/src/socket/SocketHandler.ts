@@ -475,14 +475,22 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
 
-      // 检测是否在惩罚响应中出反转牌
+      // 检测是否在惩罚响应中出反转牌、或非回合抢牌
       const player = game.state.players.get(userId);
       const card = player?.cards.find(c => c.id === data.cardId);
+      const isMyTurn = game.playerManager.getCurrentPlayerId() === userId;
       const isReverseDuringPenalty = card?.type === 'reverse' &&
         game.state.pendingDraw && game.state.pendingDraw > 0;
+      const isJumpIn = !isMyTurn && card && game.state.discardPile.length > 0 &&
+        card.color === game.state.discardPile[game.state.discardPile.length - 1].color &&
+        card.value === game.state.discardPile[game.state.discardPile.length - 1].value;
+
+      let actionType: GameActionV2['type'] = 'play';
+      if (isReverseDuringPenalty) actionType = 'reverse';
+      else if (isJumpIn) actionType = 'jumpIn';
 
       const action: GameActionV2 = {
-        type: isReverseDuringPenalty ? 'reverse' : 'play',
+        type: actionType,
         playerId: userId,
         cardIds: [data.cardId],
         chosenColor: data.chosenColor as any,
@@ -832,7 +840,17 @@ function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): an
       actions.push({ type: 'uno' });
     }
   }
-  
+
+  // 非当前回合：检测 Jump In（完全相同牌可抢出）
+  if (!isCurrentTurn && game.state.discardPile.length > 0) {
+    const topCard = game.state.discardPile[game.state.discardPile.length - 1];
+    for (const card of player.cards) {
+      if (card.color === topCard.color && card.value === topCard.value) {
+        actions.push({ type: 'jumpIn', cardId: card.id });
+      }
+    }
+  }
+
   return actions;
 }
 

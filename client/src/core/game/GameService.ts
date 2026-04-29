@@ -171,6 +171,12 @@ export class GameService {
       case 'combo':
         this.playCombo(action.payload);
         break;
+      case 'jump':
+        this.setJump(true);
+        break;
+      case 'jumpIn':
+        this.jumpIn(action.payload.cardId);
+        break;
       case 'draw':
         this.drawCard();
         break;
@@ -228,6 +234,12 @@ export class GameService {
       return;
     }
     this.socket.emit('game:challenge', { targetId, roomCode });
+  }
+
+  jumpIn(cardId: string): void {
+    const roomCode = this.getRoomCode();
+    if (!roomCode) return;
+    this.socket.emit('game:play', { roomCode, cardId });
   }
 
   setJump(jump: boolean): void {
