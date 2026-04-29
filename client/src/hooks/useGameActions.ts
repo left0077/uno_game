@@ -12,7 +12,7 @@
  * - 不再引用不存在的 V2 方法
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { getGameEngine, getGameService } from '../core';
 import type { Card, GameState } from '../../../shared/types';
