@@ -12,7 +12,7 @@
     "start": "cd server && npm start",
     "test": "./test-all.sh",
     "test:unit": "./test-all.sh",
-    "test:e2e": "cd e2e && npm test",
+    "test:e2e": "./e2e/node_modules/.bin/playwright test",
     "test:e2e:headed": "cd e2e && npm run test:headed",
     "test:e2e:ui": "cd e2e && npm run test:ui",
     "test:card": "cd server && node tests/test-card.mjs",
@@ -22,7 +22,6 @@
     "test:all": "npm run test && npm run test:e2e"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
     "concurrently": "^8.2.2",
     "puppeteer-core": "^24.39.1"
   },
