@@ -59,8 +59,9 @@ export const TIMEOUTS = {
  * 等待页面加载完成
  */
 export async function waitForPageLoad(page: Page): Promise<void> {
-  await page.waitForLoadState('networkidle');
   await page.waitForLoadState('domcontentloaded');
+  // 等待 React 渲染（Vite HMR 会保持 WebSocket 连接，不能用 networkidle）
+  await page.waitForTimeout(500);
 }
 
 /**
