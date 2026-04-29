@@ -14,7 +14,7 @@ test.setTimeout(60000);
 test.describe('新卡牌类型测试', () => {
   
   test('游戏中可以显示新卡牌', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.waitForLoadState('networkidle');
     
     // 创建房间并开始游戏
@@ -41,7 +41,7 @@ test.describe('新卡牌类型测试', () => {
   });
   
   test('Out模式下的新卡牌', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.waitForLoadState('networkidle');
     
     // 创建房间
@@ -64,7 +64,7 @@ test.describe('新卡牌类型测试', () => {
   test('移动端新卡牌显示', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.waitForLoadState('networkidle');
     
     await page.getByPlaceholder(/昵称/i).first().fill('移动端卡牌');

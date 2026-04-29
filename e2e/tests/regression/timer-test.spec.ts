@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('倒计时功能测试', () => {
   test('游戏开始后倒计时正常走动', async ({ page }) => {
     // 1. 进入首页创建房间
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.waitForSelector('input[placeholder="输入昵称..."]', { timeout: 5000 });
     await page.fill('input[placeholder="输入昵称..."]', '测试玩家');
     // 使用更精确的选择器点击创建按钮（使用force避免动画不稳定问题）

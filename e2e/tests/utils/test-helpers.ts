@@ -67,7 +67,7 @@ export async function waitForPageLoad(page: Page): Promise<void> {
  * 设置服务器 URL (用于测试前准备)
  */
 export async function setupServerUrl(page: Page, url: string = 'http://localhost:3001'): Promise<void> {
-  await page.goto('/');
+  await page.goto('/uno/');
   await page.evaluate((serverUrl) => {
     localStorage.setItem('uno-server-url', serverUrl);
   }, url);

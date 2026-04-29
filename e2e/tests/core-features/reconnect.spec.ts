@@ -9,7 +9,7 @@ test.describe('断线重连测试', () => {
   
   test('页面刷新后自动重连房间', async ({ page }) => {
     // 进入首页并创建房间
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.getByPlaceholder(/昵称/i).first().fill('测试玩家');
     await page.getByRole('button', { name: /创建房间/i }).click();
     
@@ -52,7 +52,7 @@ test.describe('断线重连测试', () => {
 
   test('游戏中刷新页面后恢复游戏状态', async ({ page }) => {
     // 创建房间并添加AI开始游戏
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.getByPlaceholder(/请输入昵称|昵称/i).fill('玩家');
     await page.getByRole('button', { name: /创建房间/i }).click();
     await page.waitForTimeout(3000); // 等待房间页面加载
@@ -161,7 +161,7 @@ test.describe('断线重连测试', () => {
 
   test('重连后倒计时正常更新', async ({ page }) => {
     // 创建房间并开始游戏
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.getByPlaceholder(/请输入昵称|昵称/i).fill('玩家');
     await page.getByRole('button', { name: /创建房间/i }).click();
     await page.waitForTimeout(3000); // 等待房间页面加载
@@ -197,7 +197,7 @@ test.describe('断线重连测试', () => {
   });
 
   test('断网后自动重连提示', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.getByPlaceholder(/昵称/i).first().fill('测试玩家');
     await page.getByRole('button', { name: /创建房间/i }).click();
     await page.waitForTimeout(3000); // 等待房间页面加载
@@ -231,7 +231,7 @@ test.describe('断线重连测试', () => {
   });
 
   test('localStorage 持久化 userId', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     // 获取 localStorage 中的 userId
     const userId1 = await page.evaluate(() => localStorage.getItem('uno-user-id'));

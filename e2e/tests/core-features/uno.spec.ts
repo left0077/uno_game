@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('UNO Online 端到端测试', () => {
   
   test('首页加载正常', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     // 检查页面标题
     await expect(page).toHaveTitle(/Uno/);
@@ -16,7 +16,7 @@ test.describe('UNO Online 端到端测试', () => {
   });
 
   test('用户名保存功能', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     const nicknameInput = page.getByPlaceholder('请输入昵称');
     
@@ -34,7 +34,7 @@ test.describe('UNO Online 端到端测试', () => {
   });
 
   test('服务器设置功能', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     // 点击服务器地址打开设置
     await page.getByText(/localhost|http/).first().click();
@@ -57,7 +57,7 @@ test.describe('UNO Online 端到端测试', () => {
   });
 
   test('创建房间流程', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     // 输入昵称
     await page.getByPlaceholder('请输入昵称').fill('房主');
@@ -121,7 +121,7 @@ test.describe('UNO Online 端到端测试', () => {
   });
 
   test('添加AI并开始游戏', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     // 输入昵称并创建房间
     await page.getByPlaceholder('请输入昵称').fill('房主');
@@ -146,7 +146,7 @@ test.describe('UNO Online 端到端测试', () => {
   });
 
   test('连接状态显示', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     // 检查连接状态
     const statusText = await page.getByText(/已连接|连接中/).textContent();

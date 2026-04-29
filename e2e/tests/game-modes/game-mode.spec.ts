@@ -14,7 +14,7 @@ test.setTimeout(60000);
 test.describe('游戏模式选择测试', () => {
   
   test('房主可以看到模式选择按钮', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.waitForLoadState('networkidle');
     
     // 创建房间
@@ -33,7 +33,7 @@ test.describe('游戏模式选择测试', () => {
   });
   
   test('房主可以切换游戏模式', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.waitForLoadState('networkidle');
     
     await page.getByPlaceholder(/昵称/i).first().fill('房主');
@@ -61,7 +61,7 @@ test.describe('游戏模式选择测试', () => {
   });
   
   test('Out模式游戏正常开始', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.waitForLoadState('networkidle');
     
     await page.getByPlaceholder(/昵称/i).first().fill('Out测试');
@@ -92,7 +92,7 @@ test.describe('游戏模式选择测试', () => {
   test('移动端模式选择UI正常', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.waitForLoadState('networkidle');
     
     await page.getByPlaceholder(/昵称/i).first().fill('移动端');

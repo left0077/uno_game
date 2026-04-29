@@ -34,7 +34,7 @@ test.describe('移动端 UI 测试', () => {
     test(`${device.name} 首页布局检查`, async ({ page }) => {
       await page.setViewportSize({ width: device.width, height: device.height });
       
-      await page.goto('/');
+      await page.goto('/uno/');
       await page.waitForLoadState('networkidle');
       
       await expect(page.locator('h1, .title').first()).toBeVisible();
@@ -50,7 +50,7 @@ test.describe('移动端 UI 测试', () => {
     test(`${device.name} 游戏页面布局检查`, async ({ page }) => {
       await page.setViewportSize({ width: device.width, height: device.height });
       
-      await page.goto('/');
+      await page.goto('/uno/');
       await page.waitForLoadState('networkidle');
       
       await createRoomAndStartGame(page, 'UI测试');

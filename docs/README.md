@@ -8,6 +8,7 @@
 | [PROTOCOL.md](./PROTOCOL.md) | Socket 协议参考（事件/payload/数据流） |
 | [ROADMAP.md](./ROADMAP.md) | 实施路线图（已完成 + 待完成） |
 | [TEST_PLAN.md](./TEST_PLAN.md) | E2E 测试计划 |
+| [TEST_STANDARDS.md](./TEST_STANDARDS.md) | E2E 测试编写规范 |
 
 ## 游戏规则
 

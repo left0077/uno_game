@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Emoji 聊天测试', () => {
   
   test('游戏界面显示 Emoji 按钮', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     // 创建房间并开始游戏
     await page.getByPlaceholder(/请输入昵称|昵称/i).fill('玩家');
@@ -96,7 +96,7 @@ test.describe('Emoji 聊天测试', () => {
 test.describe('邀请链接测试', () => {
   
   test('创建房间后 URL 包含房间号', async ({ page, context }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     // 输入昵称
     await page.getByPlaceholder(/请输入昵称|昵称/i).fill('房主');
@@ -172,7 +172,7 @@ test.describe('邀请链接测试', () => {
 test.describe('房间设置测试', () => {
   
   test('房主可以看到房间设置', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     // 创建房间
     await page.getByPlaceholder(/请输入昵称|昵称/i).fill('房主');
@@ -239,7 +239,7 @@ test.describe('房间设置测试', () => {
 test.describe('游戏结束测试', () => {
   
   test('游戏结束后显示结果', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     
     // 创建房间并开始游戏
     await page.getByPlaceholder(/请输入昵称|昵称/i).fill('玩家');

@@ -10,7 +10,7 @@ test.setTimeout(90000);
 test.describe('Out模式测试', () => {
   
   test('创建Out模式房间', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/uno/');
     await page.waitForLoadState('networkidle');
     
     await page.getByPlaceholder(/昵称/i).first().fill('Out测试');
