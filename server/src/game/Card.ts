@@ -48,6 +48,38 @@ export class CardManager {
     return this.shuffleDeck(deck);
   }
   
+  // 创建惩罚卡（+3/+5 彩色，+8 万能）
+  static createPenaltyCards(type: 'draw3' | 'draw5' | 'draw8', count: number): Card[] {
+    const cards: Card[] = [];
+    const colors = ['red', 'yellow', 'green', 'blue'] as const;
+
+    if (type === 'draw8') {
+      // 万能惩罚卡：无固定颜色
+      for (let i = 0; i < count; i++) {
+        cards.push({ id: uuidv4(), type: 'draw8', color: 'wild', value: 'draw8' });
+      }
+    } else {
+      // 彩色惩罚卡：均分到四种颜色
+      const perColor = Math.floor(count / 4);
+      const remainder = count % 4;
+      for (let ci = 0; ci < 4; ci++) {
+        const extra = ci < remainder ? 1 : 0;
+        for (let i = 0; i < perColor + extra; i++) {
+          cards.push({ id: uuidv4(), type, color: colors[ci], value: type });
+        }
+      }
+    }
+    return cards;
+  }
+
+  // 将惩罚卡注入牌库并洗牌
+  static injectPenaltyCards(deck: Card[], type: 'draw3' | 'draw5' | 'draw8', count: number): Card[] {
+    const penaltyCards = this.createPenaltyCards(type, count);
+    const combined = [...deck, ...penaltyCards];
+    console.log(`[CardManager] 注入 ${count} 张 ${type} 惩罚卡，牌库共 ${combined.length} 张`);
+    return this.shuffleDeck(combined);
+  }
+
   // 洗牌（Fisher-Yates算法）
   static shuffleDeck(deck: Card[]): Card[] {
     const shuffled = [...deck];

@@ -17,6 +17,9 @@ import { PlayerManager } from '../game/core/PlayerManager.js';
 import { GameInitializer } from '../game/core/GameInitializer.js';
 import { BaseGameModeV2 } from '../game/core/BaseGameModeV2.js';
 import { OutModeV2 } from '../game/core/OutModeV2.js';
+import { GameClock } from '../game/core/GameClock.js';
+import { CardManager } from '../game/Card.js';
+import { GAME_MODES } from '../config/gameConfig.js';
 
 // V2 游戏实例
 interface V2GameInstance {
@@ -24,6 +27,7 @@ interface V2GameInstance {
   state: GameStateV2;
   mode: BaseGameModeV2;
   playerManager: PlayerManager;
+  clock?: GameClock;
 }
 
 // 存储 V2 游戏实例
@@ -293,17 +297,87 @@ export function setupSocketHandlers(io: Server): void {
         
         v2Games.set(data.roomCode, gameInstance);
         room.status = 'playing';
-        
+
+        // 启动游戏时钟（Out 模式）
+        if (data.mode === 'out') {
+          const clock = new GameClock(
+            state,
+            mode as OutModeV2,
+            {
+              onPhaseAdvance: (phase) => {
+                (mode as OutModeV2).advancePhase(phase);
+                const phaseCfg = GAME_MODES.out.phases[phase];
+                if (phaseCfg) {
+                  for (const [cardType, count] of Object.entries(phaseCfg.injectCards)) {
+                    state.deck = CardManager.injectPenaltyCards(
+                      state.deck,
+                      cardType as 'draw3' | 'draw5' | 'draw8',
+                      count
+                    );
+                  }
+                }
+                broadcastGameStateV2(io, data.roomCode, gameInstance);
+              },
+              onAITurn: (playerId) => {
+                const player = state.players.get(playerId);
+                if (!player) return;
+                const aiAction = AIPlayer.getAIAction(
+                  player,
+                  state as any,  // AIPlayer expects shared GameState
+                  [...state.players.values()]
+                );
+                if (aiAction) {
+                  const delay = AIPlayer.getDecisionDelay(player.aiDifficulty || 'normal');
+                  setTimeout(() => {
+                    const v2Action: GameActionV2 = {
+                      type: aiAction.type as any,
+                      playerId,
+                      cardIds: aiAction.cardIds,
+                      chosenColor: (aiAction as any).chosenColor,
+                      comboType: (aiAction as any).comboType,
+                      targetId: aiAction.targetId,
+                      timestamp: Date.now()
+                    };
+                    const result = mode.handleAction(v2Action);
+                    if (result.success) {
+                      broadcastGameStateV2(io, data.roomCode, gameInstance);
+                      if (state.phase === 'finished') {
+                        handleGameEndV2(io, data.roomCode, gameInstance);
+                      }
+                    }
+                  }, delay);
+                }
+              },
+              onTurnTimeout: (playerId) => {
+                console.log(`[V2] Turn timeout: ${playerId}`);
+                mode.handleAction({ type: 'draw', playerId, timestamp: Date.now() });
+                broadcastGameStateV2(io, data.roomCode, gameInstance);
+              },
+              onGlobalTimeout: () => {
+                console.log(`[V2] Global timeout in room: ${data.roomCode}`);
+                state.phase = 'finished';
+                state.winnerId = undefined; // 平局
+                handleGameEndV2(io, data.roomCode, gameInstance);
+              },
+              onTick: () => {},
+            },
+            io,
+            data.roomCode
+          );
+          clock.start();
+          gameInstance.clock = clock;
+        }
+
         // 发送游戏开始事件（通知客户端跳转）
-        io.to(data.roomCode).emit('game:started', { 
+        io.to(data.roomCode).emit('game:started', {
           roomCode: data.roomCode,
           mode: data.mode,
-          players: room.players 
+          players: room.players
         });
-        
+
         // 发送初始状态
         broadcastGameStateV2(io, data.roomCode, gameInstance);
-        
+
         console.log(`[V2] Game started in room: ${data.roomCode}, mode: ${data.mode}`);
       } catch (error) {
         console.error('[V2] Game start failed:', error);
@@ -705,8 +779,10 @@ function handleGameEndV2(io: Server, roomCode: string, game: V2GameInstance): vo
     winnerId: result.winnerId,
     rankings: result.rankings
   });
-  
+
+  // 停止时钟
+  game.clock?.stop();
   v2Games.delete(roomCode);
-  
+
   console.log(`[V2] Game ended in room: ${roomCode}`);
 }
