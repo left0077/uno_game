@@ -1,9 +1,5 @@
 /**
  * GameClock — 游戏时钟
- *
- * 职责：
- * 1. 每秒 tick，检查阶段推进、回合超时、AI 回合、全局超时
- * 2. 不直接操作游戏状态，通过回调通知外部
  */
 
 import { Server } from 'socket.io';
@@ -12,15 +8,10 @@ import { OutModeV2 } from './OutModeV2.js';
 import { GAME_MODES } from '../../config/gameConfig.js';
 
 export interface GameClockCallbacks {
-  /** 阶段推进时调用 */
   onPhaseAdvance: (phase: number) => void;
-  /** AI 回合时调用 */
   onAITurn: (playerId: string) => void;
-  /** 回合超时 */
   onTurnTimeout: (playerId: string) => void;
-  /** 全局超时 */
   onGlobalTimeout: () => void;
-  /** 需要广播状态 */
   onTick: () => void;
 }
 
@@ -31,6 +22,8 @@ export class GameClock {
   private phases: number[];
   private turnTimer: number;
   private globalTimeout: number;
+  private tickCount = 0;
+  private aiScheduled = false;
 
   constructor(
     private state: GameStateV2,
@@ -61,18 +54,22 @@ export class GameClock {
   private tick(): void {
     if (this.state.phase !== 'playing') return;
 
+    this.tickCount++;
     const elapsed = (Date.now() - this.gameStartTime) / 1000;
 
-    // 1. 阶段推进
+    if (this.tickCount % 10 === 0) {
+      const currentId = this.state.tablePlayerIds[this.state.currentPlayerIndex];
+      const currentPlayer = currentId ? this.state.players.get(currentId) : null;
+      console.log(`[GameClock] tick ${this.tickCount}: elapsed=${Math.floor(elapsed)}s, turn=${currentPlayer?.nickname}, isAI=${currentPlayer?.isAI}, phase=${this.state.outState?.phase}`);
+    }
+
     this.checkPhaseAdvance(elapsed);
 
-    // 2. 全局超时
     if (elapsed >= this.globalTimeout) {
       this.callbacks.onGlobalTimeout();
       return;
     }
 
-    // 3. 回合超时 + AI 回合
     this.checkTurnTimeout(elapsed);
   }
 
@@ -92,16 +89,16 @@ export class GameClock {
     const player = this.state.players.get(currentId);
     if (!player) return;
 
-    // AI 回合
-    if (player.isAI) {
-      this.callbacks.onAITurn(currentId);
+    // 非 AI 回合时重置标志
+    if (!player.isAI) {
+      this.aiScheduled = false;
       return;
     }
 
-    // 人类玩家回合超时检查
-    const turnElapsed = (Date.now() - this.state.turnStartTime) / 1000;
-    if (turnElapsed >= this.turnTimer) {
-      this.callbacks.onTurnTimeout(currentId);
+    // AI 回合（防重复调度）
+    if (!this.aiScheduled) {
+      this.aiScheduled = true;
+      this.callbacks.onAITurn(currentId);
     }
   }
 }

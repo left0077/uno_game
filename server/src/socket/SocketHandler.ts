@@ -320,16 +320,23 @@ export function setupSocketHandlers(io: Server): void {
               },
               onAITurn: (playerId) => {
                 const player = state.players.get(playerId);
-                if (!player) return;
+                if (!player || !player.isAI) return;
+
+                console.log(`[AI] ${player.nickname} 回合开始，手牌${player.cards.length}张`);
+
                 const aiAction = AIPlayer.getAIAction(
                   player,
-                  state as any,  // AIPlayer expects shared GameState
+                  state as any,
                   [...state.players.values()]
                 );
-                if (aiAction) {
-                  const delay = AIPlayer.getDecisionDelay(player.aiDifficulty || 'normal');
-                  setTimeout(() => {
-                    const v2Action: GameActionV2 = {
+
+                const delay = AIPlayer.getDecisionDelay(player.aiDifficulty || 'normal');
+
+                setTimeout(() => {
+                  let action: GameActionV2;
+
+                  if (aiAction) {
+                    action = {
                       type: aiAction.type as any,
                       playerId,
                       cardIds: aiAction.cardIds,
@@ -338,15 +345,32 @@ export function setupSocketHandlers(io: Server): void {
                       targetId: aiAction.targetId,
                       timestamp: Date.now()
                     };
-                    const result = mode.handleAction(v2Action);
-                    if (result.success) {
-                      broadcastGameStateV2(io, data.roomCode, gameInstance);
-                      if (state.phase === 'finished') {
-                        handleGameEndV2(io, data.roomCode, gameInstance);
-                      }
+                  } else {
+                    // 无可用动作，强制摸牌
+                    action = { type: 'draw', playerId, timestamp: Date.now() };
+                  }
+
+                  console.log(`[AI] ${player.nickname} 执行: ${action.type}` +
+                    (action.cardIds ? ` ${action.cardIds.length}张` : ''));
+
+                  const result = mode.handleAction(action);
+
+                  if (result.success) {
+                    broadcastGameStateV2(io, data.roomCode, gameInstance);
+                    if (state.phase === 'finished') {
+                      handleGameEndV2(io, data.roomCode, gameInstance);
                     }
-                  }, delay);
-                }
+                  } else {
+                    // AI 动作被拒绝，强制摸牌兜底
+                    console.log(`[AI] ${player.nickname} 动作被拒，兜底摸牌: ${result.error?.message}`);
+                    const fallback = mode.handleAction({
+                      type: 'draw', playerId, timestamp: Date.now()
+                    });
+                    if (fallback.success) {
+                      broadcastGameStateV2(io, data.roomCode, gameInstance);
+                    }
+                  }
+                }, delay);
               },
               onTurnTimeout: (playerId) => {
                 console.log(`[V2] Turn timeout: ${playerId}`);
