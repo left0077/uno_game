@@ -121,7 +121,7 @@ export async function createRoom(
   options?: { waitForNavigation?: boolean }
 ): Promise<string> {
   // 访问首页
-  await page.goto('/');
+  await page.goto('/uno/');
   await waitForPageLoad(page);
   
   // 等待连接就绪（创建房间按钮变为可用）
@@ -173,9 +173,9 @@ export async function joinRoom(
   // 先清除 localStorage 避免状态干扰
   await page.goto('/uno/');
   await page.evaluate(() => localStorage.clear());
-  
+
   // 然后通过邀请链接进入
-  await page.goto(`/?room=${roomCode}`);
+  await page.goto(`/uno/?room=${roomCode}`);
   await waitForPageLoad(page);
   
   // 等待连接就绪
@@ -458,6 +458,14 @@ export async function expectPlayerExists(page: Page, playerName: string): Promis
     const text = await page.innerText('body');
     expect(text).toContain(playerName);
   }
+}
+
+/**
+ * 获取当前手牌数量
+ */
+export async function getHandCardCount(page: Page): Promise<number> {
+  const cards = page.locator('[class*="card"], [data-card]');
+  return await cards.count();
 }
 
 // ==================== 多浏览器支持 ====================
