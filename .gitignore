@@ -38,6 +38,8 @@ coverage/
 .cache/
 *.tgz
 e2e/test-results/
+e2e/playwright-report/
+test-results/
 
 # Backup files
 *.bak/
