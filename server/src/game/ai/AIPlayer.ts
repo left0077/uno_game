@@ -45,36 +45,44 @@ export class AIPlayer {
     gameState: GameState
   ): GameAction[] {
     const actions: GameAction[] = [];
-    
-    // 简化的可用动作计算
-    // 实际游戏中，这些应该由服务器推送或从v2:availableActions获取
-    
+    const topCard = gameState.discardPile[gameState.discardPile.length - 1];
+    const currentColor = gameState.currentColor;
+    const hasPending = (gameState.pendingDraw || 0) > 0;
+
     // 摸牌总是可用
-    actions.push({
-      type: 'draw',
-      playerId: player.id,
-      timestamp: Date.now()
-    });
-    
-    // 如果有手牌，添加出牌动作
+    actions.push({ type: 'draw', playerId: player.id, timestamp: Date.now() });
+
+    // 过滤可出牌
     for (const card of player.cards) {
-      actions.push({
-        type: 'play',
-        playerId: player.id,
-        cardIds: [card.id],
-        timestamp: Date.now()
-      });
+      let canPlay = false;
+
+      if (hasPending) {
+        // 有累积惩罚时，只能出同类型 + 牌
+        canPlay = card.type === gameState.pendingDrawType;
+      } else if (card.type === 'wild' || card.type === 'draw4' || card.type === 'draw8') {
+        // 万能牌总是可出
+        canPlay = true;
+      } else if (card.color === currentColor) {
+        canPlay = true;
+      } else if (topCard && card.value === topCard.value) {
+        canPlay = true;
+      }
+
+      if (canPlay) {
+        actions.push({
+          type: 'play',
+          playerId: player.id,
+          cardIds: [card.id],
+          timestamp: Date.now()
+        });
+      }
     }
-    
-    // UNO按钮（剩2张或更少时）
+
+    // UNO（剩 2 张或更少）
     if (player.cards.length <= 2) {
-      actions.push({
-        type: 'uno',
-        playerId: player.id,
-        timestamp: Date.now()
-      });
+      actions.push({ type: 'uno', playerId: player.id, timestamp: Date.now() });
     }
-    
+
     return actions;
   }
   
