@@ -89,7 +89,7 @@ export function GamePage({ gameActions, onLeaveRoom }: GamePageProps) {
   }
 
   return (
-    <div className="min-h-screen p-4 relative z-10">
+    <div className="min-h-screen p-2 sm:p-4 pb-24 sm:pb-4 relative z-10">
       {/* 顶部信息栏 */}
       <GameHeader
         roomCode={room.code}
@@ -266,24 +266,32 @@ function OtherPlayers({
   players,
   currentPlayerId
 }: {
-  players: { id: string; nickname: string; cardCount?: number }[];
+  players: { id: string; nickname: string; cardCount?: number; isAI?: boolean }[];
   currentPlayerId: string;
 }) {
   return (
-    <div className="flex justify-center gap-2 sm:gap-3 flex-wrap px-2">
+    <div className="flex justify-center gap-1.5 sm:gap-3 flex-wrap px-1">
       {players.map((player) => (
         <div
           key={player.id}
           className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border transition-all ${
             player.id === currentPlayerId
-              ? 'bg-gold/15 border-gold/50 shadow-lg'
+              ? 'bg-gold/20 border-gold/50 shadow-lg shadow-gold/10 scale-105'
               : 'bg-felt-dark/60 border-gold/10'
           }`}
         >
-          <div className={`text-xs sm:text-sm font-medium truncate max-w-[60px] sm:max-w-[80px] ${
-            player.id === currentPlayerId ? 'text-gold-light' : 'text-cream'
-          }`}>
-            {player.nickname}
+          <div className="flex items-center gap-1">
+            {player.id === currentPlayerId && (
+              <span className="w-1.5 h-1.5 bg-gold rounded-full animate-pulse" />
+            )}
+            <span className={`text-xs sm:text-sm font-medium truncate max-w-[50px] sm:max-w-[80px] ${
+              player.id === currentPlayerId ? 'text-gold-light' : 'text-cream'
+            }`}>
+              {player.nickname}
+            </span>
+            {player.isAI && (
+              <span className="text-[10px] text-blue-300/70" title="AI">AI</span>
+            )}
           </div>
           <div className="text-cream-muted/60 text-[10px] sm:text-xs text-center mt-0.5">{player.cardCount ?? 0} 张</div>
         </div>
@@ -364,16 +372,22 @@ function MyHand({
   onPlayCard: (cardId: string) => void;
   canPlay: (cardId: string) => boolean;
 }) {
+  if (cards.length === 0) return null;
+
   return (
-    <div className="flex justify-center gap-2 flex-wrap py-4">
-      {cards.map((card) => {
+    <div className="flex justify-center items-end gap-0.5 sm:gap-1 py-3 sm:py-4 overflow-x-auto px-2">
+      {cards.map((card, idx) => {
         const playable = isMyTurn && canPlay(card.id);
 
         return (
-          <div key={card.id} className="-mx-1 first:ml-0 last:mr-0">
+          <div
+            key={card.id}
+            className="flex-shrink-0 -mx-1 sm:-mx-0.5 first:ml-0 last:mr-0"
+            style={{ zIndex: playable ? 10 + idx : idx }}
+          >
             <Card
               card={card}
-              size="md"
+              size={cards.length > 10 ? 'sm' : 'md'}
               isPlayable={playable}
               disabled={!playable}
               onClick={() => onPlayCard(card.id)}
@@ -399,18 +413,20 @@ function GameControls({
   onCallUno: () => void;
 }) {
   return (
-    <div className="flex justify-center gap-3 sm:gap-4 mt-4 sm:mt-6">
+    <div className="fixed bottom-0 left-0 right-0 sm:relative sm:bottom-auto sm:left-auto sm:right-auto
+      flex justify-center gap-4 sm:gap-4 mt-4 sm:mt-6 p-3 sm:p-0
+      bg-gradient-to-t from-felt/95 via-felt/80 to-transparent sm:bg-none z-20">
       <button
         onClick={onDrawCard}
         disabled={!isMyTurn || !canDraw}
-        className="px-6 sm:px-8 py-2.5 sm:py-3 btn-soft-blue text-sm sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed min-w-[80px] sm:min-w-[100px] active:scale-95 sm:active:scale-100 transition-transform"
+        className="px-8 sm:px-8 py-3 sm:py-3 btn-soft-blue text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed min-w-[100px] sm:min-w-[100px] active:scale-95 transition-all rounded-xl font-medium"
       >
         摸牌
       </button>
       <button
         onClick={onCallUno}
         disabled={!canCallUno}
-        className={`px-6 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-lg rounded-xl font-medium transition-all min-w-[80px] sm:min-w-[100px] active:scale-95 sm:active:scale-100
+        className={`px-8 sm:px-8 py-3 sm:py-3 text-base sm:text-lg rounded-xl font-bold transition-all min-w-[100px] sm:min-w-[100px] active:scale-95
           ${canCallUno
             ? 'btn-soft-red animate-pulse'
             : 'bg-felt-dark/60 text-cream-muted border border-gold/20 cursor-not-allowed'
@@ -430,33 +446,35 @@ function ColorPickerModal({
   onCancel: () => void;
 }) {
   const colors = [
-    { key: 'red', label: '红色', bg: 'bg-uno-red', border: 'border-red-300' },
-    { key: 'blue', label: '蓝色', bg: 'bg-uno-blue', border: 'border-blue-300' },
-    { key: 'green', label: '绿色', bg: 'bg-uno-green', border: 'border-green-300' },
-    { key: 'yellow', label: '黄色', bg: 'bg-uno-yellow', border: 'border-yellow-300', text: 'text-slate-800' }
+    { key: 'red', label: '红色', bg: 'bg-uno-red', border: 'border-red-300', emoji: '🔴' },
+    { key: 'blue', label: '蓝色', bg: 'bg-uno-blue', border: 'border-blue-300', emoji: '🔵' },
+    { key: 'green', label: '绿色', bg: 'bg-uno-green', border: 'border-green-300', emoji: '🟢' },
+    { key: 'yellow', label: '黄色', bg: 'bg-uno-yellow', border: 'border-yellow-300', text: 'text-slate-800', emoji: '🟡' }
   ];
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="casino-card p-4 sm:p-8 max-w-sm w-full mx-auto">
-        <h3 className="text-gold-light text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-center">选择颜色</h3>
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <div className="casino-card p-6 sm:p-8 max-w-xs sm:max-w-sm w-full mx-auto">
+        <h3 className="text-gold-light text-xl sm:text-2xl font-bold mb-6 text-center">选择颜色</h3>
+        <div className="grid grid-cols-2 gap-4 sm:gap-5">
           {colors.map((c) => (
             <button
               key={c.key}
               onClick={() => onSelect(c.key)}
               className={`w-full aspect-square ${c.bg} ${c.text || 'text-white'}
-                rounded-xl flex items-center justify-center font-bold text-base sm:text-lg
-                hover:scale-105 active:scale-95 sm:active:scale-100 transition-transform shadow-lg border-2 ${c.border}`}
+                rounded-2xl flex flex-col items-center justify-center font-bold text-lg sm:text-xl gap-2
+                active:scale-95 transition-all shadow-xl border-2 ${c.border}
+                min-h-[80px] sm:min-h-[100px]`}
             >
-              {c.label}
+              <span className="text-2xl sm:text-3xl">{c.emoji}</span>
+              <span>{c.label}</span>
             </button>
           ))}
         </div>
         <button
           onClick={onCancel}
-          className="w-full mt-4 sm:mt-6 py-2.5 sm:py-3 bg-felt-dark/60 border border-gold/20 text-gold rounded-xl 
-            hover:border-gold/40 transition-all font-medium text-sm sm:text-base"
+          className="w-full mt-5 sm:mt-6 py-3 sm:py-3.5 bg-felt-dark/60 border border-gold/20 text-gold rounded-xl
+            hover:border-gold/40 transition-all font-medium text-base sm:text-lg"
         >
           取消
         </button>
