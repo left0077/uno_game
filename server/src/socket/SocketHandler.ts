@@ -17,6 +17,7 @@ import { PlayerManager } from '../game/core/PlayerManager.js';
 import { GameInitializer } from '../game/core/GameInitializer.js';
 import { BaseGameModeV2 } from '../game/core/BaseGameModeV2.js';
 import { OutModeV2 } from '../game/core/OutModeV2.js';
+import { StandardModeV2 } from '../game/core/StandardModeV2.js';
 import { GameClock } from '../game/core/GameClock.js';
 import { CardManager } from '../game/Card.js';
 import { GAME_MODES } from '../config/gameConfig.js';
@@ -280,11 +281,9 @@ export function setupSocketHandlers(io: Server): void {
         });
 
         // 创建模式
-        const mode = data.mode === 'out' ? new OutModeV2() : null;
-        if (!mode) {
-          socket.emit(SocketEvents.ERROR, { code: 'MODE_NOT_SUPPORTED', message: '该模式尚未支持' });
-          return;
-        }
+        const mode = data.mode === 'out'
+          ? new OutModeV2()
+          : new StandardModeV2();
 
         mode.initialize(state);
 
@@ -298,7 +297,8 @@ export function setupSocketHandlers(io: Server): void {
         v2Games.set(data.roomCode, gameInstance);
         room.status = 'playing';
 
-        // 启动游戏时钟（Out 模式）
+        // 启动游戏时钟（仅 Out 模式需要阶段推进和 AI 触发）
+        if (data.mode === 'out') {
         if (data.mode === 'out') {
           const clock = new GameClock(
             state,
