@@ -199,7 +199,7 @@ AIPlayer (静态门面)
       └── HardAIStrategy   (ALL capabilities, 蒙特卡洛 + 欺骗策略)
 ```
 
-当前 AI 模块存在但**未被游戏循环调用**，需要补全 SocketHandler 的 AI 回合触发。
+GameClock 每秒 tick 检测 AI 回合，通过 `onAITurn` 回调自动触发 AI 决策。
 
 ---
 
@@ -209,7 +209,7 @@ AIPlayer (静态门面)
 |------|------|------|
 | BaseGameModeV2 (核心规则引擎) | ✅ 已实现 | 模板方法模式，5个P0 bug已修复 |
 | OutModeV2 (连打 + 淘汰) | ✅ 对齐规则书 v2.1 | 连打无惩罚，固定20上限，回合检查 |
-| StandardModeV2 | ❌ 待实现 | 架构支持，缺子类 |
+| StandardModeV2 | ✅ 已实现 | 经典 UNO 规则，继承 BaseGameModeV2 |
 | PlayerManager (排名 + 回合) | ✅ 已实现 | Skip效果已生效 |
 | GameClock (时钟) | ✅ 已实现 | 阶段推进/AI触发/超时检测 |
 | AIPlayer (三级策略) | ✅ 游戏循环调用 | GameClock 自动触发 AI 回合 |
