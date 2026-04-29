@@ -20,6 +20,6 @@
     "clean": "rm -rf test-results playwright-report playwright-report-local"
   },
   "devDependencies": {
-    "@playwright/test": "^1.40.0"
+    "@playwright/test": "^1.59.1"
   }
 }

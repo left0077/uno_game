@@ -36,7 +36,6 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   const store = useGameStore();
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [pendingCardId, setPendingCardId] = useState<string | null>(null);
-  const [emojiMessages, setEmojiMessages] = useState<Array<{ playerId: string; emoji: EmojiType; target?: string; timestamp: number }>>([]);
 
   const gameState = store.gameState;
   const room = store.room;
