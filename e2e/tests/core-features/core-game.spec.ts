@@ -4,7 +4,7 @@ test.describe('核心功能验证', () => {
   test('首页加载和创建房间', async ({ page }) => {
     // 1. 访问首页
     await page.goto('/uno/');
-    await expect(page.locator('h1')).toContainText('Uno');
+    await expect(page.locator('h1')).toContainText('UNO');
     console.log('✅ 首页加载');
 
     // 2. 输入昵称
