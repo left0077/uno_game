@@ -58,6 +58,26 @@ export function setupSocketHandlers(io: Server): void {
     socket.on('auth', (data: { userId: string; nickname: string }) => {
       socketUserMap.set(socket.id, data.userId);
       console.log(`[V2] Socket ${socket.id} authenticated as ${data.userId}`);
+
+      // 断线重连恢复：检查用户是否在某个房间中是被托管状态，恢复控制权
+      const existingRoom = roomManager.getPlayerRoom(data.userId);
+      if (existingRoom) {
+        const player = existingRoom.players.find(p => p.id === data.userId);
+        if (player && player.isAI && player.aiType === 'host') {
+          player.isAI = false;
+          player.aiType = undefined;
+          player.isConnected = true;
+          socket.join(existingRoom.code);
+          io.to(existingRoom.code).emit(SocketEvents.ROOM_UPDATED, existingRoom);
+          console.log(`[V2] Player ${player.nickname} reconnected, control restored`);
+
+          // 如果在游戏中，发送当前状态
+          const game = v2Games.get(existingRoom.code);
+          if (game) {
+            broadcastGameStateV2(io, existingRoom.code, game);
+          }
+        }
+      }
     });
 
     // ========== 房间管理 ==========
