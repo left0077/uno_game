@@ -79,14 +79,15 @@ export interface GameStateV2 {
 // 动作类型 V2
 // ============================================================================
 
-export type GameActionTypeV2 = 
+export type GameActionTypeV2 =
   | 'play'      // 打出单张牌
   | 'combo'     // 连打出牌
   | 'draw'      // 摸牌
   | 'skip'      // 跳过回合
   | 'uno'       // 喊UNO
   | 'challenge' // 挑战UNO
-  | 'jumpIn';   // 抢牌
+  | 'jumpIn'    // 抢牌
+  | 'reverse';  // 惩罚弹回
 
 export interface GameActionV2 {
   type: GameActionTypeV2;

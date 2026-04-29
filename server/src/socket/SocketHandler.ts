@@ -455,14 +455,20 @@ export function setupSocketHandlers(io: Server): void {
     socket.on(SocketEvents.GAME_PLAY, (data: { roomCode: string; cardId: string; chosenColor?: string }) => {
       const userId = socketUserMap.get(socket.id) || socket.id;
       const game = v2Games.get(data.roomCode);
-      
+
       if (!game) {
         socket.emit(SocketEvents.ERROR, { code: 'GAME_NOT_FOUND', message: '游戏不存在' });
         return;
       }
 
+      // 检测是否在惩罚响应中出反转牌
+      const player = game.state.players.get(userId);
+      const card = player?.cards.find(c => c.id === data.cardId);
+      const isReverseDuringPenalty = card?.type === 'reverse' &&
+        game.state.pendingDraw && game.state.pendingDraw > 0;
+
       const action: GameActionV2 = {
-        type: 'play',
+        type: isReverseDuringPenalty ? 'reverse' : 'play',
         playerId: userId,
         cardIds: [data.cardId],
         chosenColor: data.chosenColor as any,
@@ -708,6 +714,7 @@ function serializeGameStateV2(game: V2GameInstance): any {
     // 惩罚状态
     pendingDraw: state.pendingDraw || 0,
     pendingDrawType: state.pendingDrawType,
+    penaltySourceId: state.penaltySourceId,
     skippedPlayerId: state.skippedPlayerId,
     
     // 玩家列表（不包含手牌，手牌单独发送）
@@ -753,37 +760,47 @@ function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): an
   const isCurrentTurn = game.playerManager.getCurrentPlayerId() === playerId;
   
   if (isCurrentTurn) {
-    // 可出的牌
     const topCard = game.state.discardPile[game.state.discardPile.length - 1];
-    
+    const hasPending = game.state.pendingDraw && game.state.pendingDraw > 0;
+
     for (const card of player.cards) {
       let canPlay = false;
-      
-      // 有累积惩罚时只能叠加
-      if (game.state.pendingDraw && game.state.pendingDraw > 0) {
-        canPlay = card.type === game.state.pendingDrawType;
+      let actionType = 'play';
+
+      if (hasPending) {
+        // 有累积惩罚时：可跟+（任意类型）、可出反转弹回
+        canPlay = card.type === 'draw2' || card.type === 'draw3' ||
+                  card.type === 'draw4' || card.type === 'draw5' ||
+                  card.type === 'draw8' || card.type === 'reverse';
+        if (canPlay && card.type === 'reverse') {
+          actionType = 'reverse';
+        }
       } else {
-        // 万能牌
         if (card.type === 'wild' || card.type === 'draw4') canPlay = true;
-        // 颜色匹配
         else if (card.color === game.state.currentColor) canPlay = true;
-        // 数值匹配
         else if (topCard && card.value === topCard.value) canPlay = true;
       }
-      
+
       if (canPlay) {
         actions.push({
-          type: 'play',
+          type: actionType,
           cardId: card.id,
           requiresColor: card.type === 'wild' || card.type === 'draw4'
         });
       }
     }
-    
-    // 摸牌
+
+    // 惩罚信息
+    if (hasPending) {
+      actions.push({
+        type: 'penalty_info',
+        pendingDraw: game.state.pendingDraw,
+        penaltySourceId: game.state.penaltySourceId
+      });
+    }
+
     actions.push({ type: 'draw' });
-    
-    // 喊UNO
+
     if (player.cards.length <= 2) {
       actions.push({ type: 'uno' });
     }

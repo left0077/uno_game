@@ -128,6 +128,8 @@ export abstract class BaseGameModeV2 {
         return this.validateChallenge(action);
       case 'jumpIn':
         return this.validateJumpIn(action);
+      case 'reverse':
+        return this.validateReverse(action);
       default:
         return { valid: false, error: `Unknown action type: ${type}` };
     }
@@ -227,12 +229,22 @@ export abstract class BaseGameModeV2 {
     if (!this.config.allowJumpIn) {
       return { valid: false, error: 'Jump in is not allowed' };
     }
-    
-    // 抢牌不能是当前玩家
     if (this.playerManager.getCurrentPlayerId() === action.playerId) {
       return { valid: false, error: 'Cannot jump in on your turn' };
     }
-    
+    return { valid: true };
+  }
+
+  protected validateReverse(action: GameActionV2): ValidationResult {
+    if (this.playerManager.getCurrentPlayerId() !== action.playerId) {
+      return { valid: false, error: 'Not your turn' };
+    }
+    if (!this.state.pendingDraw || this.state.pendingDraw <= 0) {
+      return { valid: false, error: 'No pending penalty to reverse' };
+    }
+    if (!this.state.penaltySourceId) {
+      return { valid: false, error: 'No penalty source to bounce to' };
+    }
     return { valid: true };
   }
   
@@ -262,6 +274,9 @@ export abstract class BaseGameModeV2 {
         break;
       case 'jumpIn':
         this.executeJumpIn(action);
+        break;
+      case 'reverse':
+        this.executeReverse(action);
         break;
     }
   }
@@ -353,6 +368,49 @@ export abstract class BaseGameModeV2 {
     }
   }
   
+  /**
+   * 执行反转弹回惩罚
+   */
+  protected executeReverse(action: GameActionV2): void {
+    const { playerId, cardIds } = action;
+    const player = this.state.players.get(playerId)!;
+    const cardId = cardIds![0];
+    const cardIndex = player.cards.findIndex(c => c.id === cardId);
+
+    // 移除反转牌
+    player.cards.splice(cardIndex, 1);
+    player.cardCount = player.cards.length;
+    this.state.discardPile.push(player.cards[cardIndex] || this.state.discardPile[this.state.discardPile.length - 1]);
+
+    // 弹回惩罚到来源玩家
+    const sourceId = this.state.penaltySourceId!;
+    const pendingAmount = this.state.pendingDraw || 0;
+
+    // 清空当前惩罚
+    this.state.pendingDraw = 0;
+    this.state.pendingDrawType = undefined;
+    this.state.penaltySourceId = undefined;
+
+    // 将惩罚转移到来源玩家
+    const sourcePlayer = this.state.players.get(sourceId);
+    if (sourcePlayer) {
+      // 设置来源玩家为当前惩罚目标
+      this.state.pendingDraw = pendingAmount;
+      this.state.penaltySourceId = playerId; // 现在轮到原玩家来反制
+
+      // 找到来源玩家的索引并设置为当前
+      const sourceIdx = this.state.tablePlayerIds.indexOf(sourceId);
+      if (sourceIdx !== -1) {
+        this.state.currentPlayerIndex = sourceIdx;
+      }
+    }
+
+    // 反转方向
+    this.playerManager.reverseDirection();
+
+    console.log(`[BaseGameModeV2] ${player.nickname} 反转弹回 +${pendingAmount} 给 ${sourcePlayer?.nickname}`);
+  }
+
   /**
    * 执行抢牌
    */
@@ -475,6 +533,10 @@ export abstract class BaseGameModeV2 {
   
   protected applyDrawEffect(type: 'draw2' | 'draw4' | 'draw3' | 'draw5' | 'draw8'): void {
     const amount = parseInt(type.replace('draw', ''), 10);
+    // 记录惩罚来源（第一个出+的人）
+    if (!this.state.pendingDraw) {
+      this.state.penaltySourceId = this.playerManager.getPreviousPlayerId();
+    }
     this.state.pendingDraw = (this.state.pendingDraw || 0) + amount;
     this.state.pendingDrawType = type;
   }
