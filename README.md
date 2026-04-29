@@ -80,8 +80,9 @@ cd e2e && npx playwright test
 ## 文档
 
 - [架构文档](docs/ARCHITECTURE.md)
-- [规则书](docs/rules/)
-- [实施计划](docs/IMPLEMENTATION_PLAN.md)
+- [协议参考](docs/PROTOCOL.md)
+- [规则书](docs/game-rules/)
+- [实施路线](docs/ROADMAP.md)
 
 ---
 

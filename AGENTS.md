@@ -101,8 +101,9 @@ cd e2e && npx playwright test             # E2E 测试
 ## 文档
 
 - [架构文档](docs/ARCHITECTURE.md)
-- [规则书](docs/rules/out-mode.md)
-- [实施计划](docs/IMPLEMENTATION_PLAN.md)
+- [协议参考](docs/PROTOCOL.md)
+- [规则书](docs/game-rules/out-mode.md)
+- [实施路线](docs/ROADMAP.md)
 - [测试计划](docs/TEST_PLAN.md)
 
 *最后更新：2026-04-30*
