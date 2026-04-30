@@ -775,6 +775,9 @@ function serializeGameStateV2(game: V2GameInstance): any {
       ? calculateResult(state).rankings
       : null,
     
+    // 惩罚统计
+    penaltyStats: state.penaltyStats || {},
+
     // Out模式特有
     outState: state.outState,
 

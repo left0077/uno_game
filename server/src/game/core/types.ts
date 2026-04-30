@@ -69,6 +69,9 @@ export interface GameStateV2 {
   /** 惩罚响应截止时间（被惩罚玩家必须在此前响应） */
   responseDeadline?: number;
 
+  /** 玩家累计受罚统计（显示"谁最惨"） */
+  penaltyStats?: Record<string, number>;
+
   /** 惩罚来源玩家 ID（反转弹回用） */
   penaltySourceId?: string;
 

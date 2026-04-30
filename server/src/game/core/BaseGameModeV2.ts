@@ -341,6 +341,10 @@ export abstract class BaseGameModeV2 {
     // 摸牌：有累积惩罚时摸满，否则摸 1 张
     const drawCount = this.state.pendingDraw || 1;
     this.drawCardsForPlayer(action.playerId, drawCount);
+    if (drawCount > 1) {
+      if (!this.state.penaltyStats) this.state.penaltyStats = {};
+      this.state.penaltyStats[action.playerId] = (this.state.penaltyStats[action.playerId] || 0) + drawCount;
+    }
     this.state.pendingDraw = 0;
     this.state.pendingDrawType = undefined;
 

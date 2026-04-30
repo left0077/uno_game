@@ -151,6 +151,7 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
 
   const lastPlay = (gameState as any).lastPlay;
   const canUno = gameActions.myHand.length <= 2;
+  const myUnoCalled = room?.players.find(p => p.id === store.userId)?.hasCalledUno;
 
   return (
     <div className="min-h-screen bg-casino flex flex-col relative z-10">
@@ -173,7 +174,7 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
       </div>
 
       {/* ====== 玩家头像行 ====== */}
-      <OtherPlayers players={gameState.players || room.players} currentPlayerId={gameState.currentPlayerId} />
+      <OtherPlayers players={gameState.players || room.players} currentPlayerId={gameState.currentPlayerId} penaltyStats={(gameState as any).penaltyStats || {}} />
 
       {/* ====== 主游戏区 ====== */}
       <div className="flex-1 flex flex-col items-center justify-center px-2 gap-3 max-w-lg mx-auto w-full">
@@ -181,6 +182,9 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
         {/* 牌堆 + 颜色 */}
         <div className="flex items-center justify-center gap-6 mt-2">
           <DiscardPile topCard={gameState.topCard} />
+          {pendingDraw > 0 && (
+            <div className="text-red-400 font-bold text-lg animate-pulse">+{pendingDraw}</div>
+          )}
           <DrawPile onDraw={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} />
         </div>
         <ColorDot color={gameState.currentColor} />
@@ -232,11 +236,12 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
             className="px-5 py-2 btn-soft-blue text-sm rounded-xl disabled:opacity-40">
             摸牌
           </button>
-          <button onClick={handleCallUno} disabled={!canUno}
+          <button onClick={handleCallUno} disabled={!canUno || !!myUnoCalled}
             className={`px-5 py-2 text-sm rounded-xl font-bold transition-all ${
+              myUnoCalled ? 'bg-emerald-700 text-white border border-emerald-400' :
               canUno ? 'btn-soft-red animate-pulse' : 'bg-felt-dark/60 text-cream-muted/40 cursor-not-allowed'
             }`}>
-            UNO!
+            {myUnoCalled ? 'UNO ✓' : 'UNO!'}
           </button>
         </div>
       </div>
@@ -358,10 +363,12 @@ function _GameHeader({
 
 function OtherPlayers({
   players,
-  currentPlayerId
+  currentPlayerId,
+  penaltyStats
 }: {
-  players: { id: string; nickname: string; cardCount?: number; isAI?: boolean; status?: string; eliminated?: boolean }[];
+  players: { id: string; nickname: string; cardCount?: number; isAI?: boolean; status?: string; eliminated?: boolean; hasCalledUno?: boolean }[];
   currentPlayerId: string;
+  penaltyStats: Record<string, number>;
 }) {
   return (
     <div className="flex justify-center gap-1.5 sm:gap-3 flex-wrap px-1">
@@ -405,9 +412,15 @@ function OtherPlayers({
               {player.isAI && (
                 <span className="text-[10px] text-blue-300/70">AI</span>
               )}
+              {(player.hasCalledUno || player.cardCount === 1) && (
+                <span className="text-[10px] bg-red-600 text-white px-1 rounded font-bold animate-pulse">UNO!</span>
+              )}
             </div>
             <div className="text-cream-muted/60 text-[10px] sm:text-xs text-center mt-0.5">
               {isFinished ? '🏆 完成!' : isEliminated ? '💀 淘汰' : `${player.cardCount ?? 0} 张`}
+              {(penaltyStats[player.id] || 0) > 0 && (
+                <span className="text-red-400/70 ml-1">😭+{penaltyStats[player.id]}</span>
+              )}
             </div>
           </div>
         );
