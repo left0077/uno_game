@@ -103,16 +103,9 @@ export function useGameActions() {
    * @returns 是否成功
    */
   const callUno = useCallback((): boolean => {
-    const action = engine.createUnoAction();
-    
-    if (!action) {
-      console.warn('[useGameActions] Cannot call UNO');
-      return false;
-    }
-
-    gameService.executeAction(action);
+    gameService.callUno();
     return true;
-  }, [engine, gameService]);
+  }, [gameService]);
 
   /**
    * 挑战玩家
