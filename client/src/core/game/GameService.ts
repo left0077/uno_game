@@ -263,6 +263,7 @@ export class GameService {
 
   sendEmoji(emoji: string): void {
     const roomCode = this.getRoomCode();
+    console.log('[GameService] sendEmoji:', emoji, 'room:', roomCode);
     if (!roomCode) return;
     this.socket.emit('chat:send', { roomCode, type: 'emoji', content: emoji });
   }

@@ -1,79 +1,59 @@
-import React, { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-export type EmojiType = 
-  | 'thinking' 
-  | 'happy' 
-  | 'sad' 
-  | 'angry' 
-  | 'surprised' 
-  | 'taunt' 
-  | 'desperate' 
-  | 'victory';
-
-interface EmojiMessage {
+export interface EmojiMessage {
   playerId: string;
-  emoji: EmojiType;
+  playerName?: string;
+  emoji: string;
   target?: string;
   timestamp: number;
 }
 
 interface EmojiOverlayProps {
   messages: EmojiMessage[];
+  players?: Array<{ id: string; nickname: string }>;
   onDismiss: (timestamp: number) => void;
 }
 
-const emojiMap: Record<EmojiType, string> = {
-  thinking: '🤔',
-  happy: '😊',
-  sad: '😢',
-  angry: '😠',
-  surprised: '😲',
-  taunt: '😏',
-  desperate: '😰',
-  victory: '🏆'
-};
+export const EmojiOverlay = ({ messages, players, onDismiss }: EmojiOverlayProps) => {
+  const [visible, setVisible] = useState<Record<number, boolean>>({});
 
-const emojiText: Record<EmojiType, string> = {
-  thinking: '思考中...',
-  happy: '不错！',
-  sad: '哎呀...',
-  angry: '可恶！',
-  surprised: '什么？！',
-  taunt: '来啊！',
-  desperate: '救命...',
-  victory: '赢了！'
-};
-
-export const EmojiOverlay: React.FC<EmojiOverlayProps> = ({ messages, onDismiss }) => {
   useEffect(() => {
-    // 3秒后自动消失
-    const timers = messages.map(msg => 
-      setTimeout(() => onDismiss(msg.timestamp), 3000) // TODO: 使用 ANIMATION_CONFIG.emojiDisplayTime
+    const next: Record<number, boolean> = {};
+    messages.forEach(m => { next[m.timestamp] = true; });
+    setVisible(next);
+
+    const timers = messages.map(msg =>
+      setTimeout(() => {
+        setVisible(prev => ({ ...prev, [msg.timestamp]: false }));
+        setTimeout(() => onDismiss(msg.timestamp), 300);
+      }, 3000)
     );
     return () => timers.forEach(clearTimeout);
   }, [messages, onDismiss]);
 
   if (messages.length === 0) return null;
 
+  // 最近 5 条
+  const recent = messages.slice(-5);
+
   return (
-    <div className="fixed inset-0 pointer-events-none z-50">
-      {messages.map((msg, index) => (
-        <div
-          key={msg.timestamp}
-          className="absolute animate-bounce"
-          style={{
-            left: `${20 + (index % 3) * 30}%`,
-            top: `${20 + Math.floor(index / 3) * 25}%`,
-          }}
-        >
-          <div className="bg-felt-dark/95 backdrop-blur rounded-full px-4 py-2 shadow-lg border-2 border-gold/40">
-            <span className="text-3xl">{emojiMap[msg.emoji]}</span>
-            <span className="ml-2 text-sm font-bold text-cream">
-              {emojiText[msg.emoji]}
-            </span>
+    <div className="fixed top-20 right-4 z-50 pointer-events-none flex flex-col gap-2">
+      {recent.map((msg) => {
+        const name = players?.find(p => p.id === msg.playerId)?.nickname || '玩家';
+        const show = visible[msg.timestamp] !== false;
+
+        return (
+          <div
+            key={msg.timestamp}
+            className={`flex items-center gap-2 bg-black/80 backdrop-blur rounded-2xl px-3 py-2
+              border border-gold/20 shadow-xl transition-all duration-300
+              ${show ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}
+          >
+            <span className="text-2xl">{msg.emoji}</span>
+            <span className="text-cream text-xs max-w-[120px] truncate">{name}</span>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

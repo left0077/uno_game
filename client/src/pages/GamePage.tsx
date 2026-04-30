@@ -222,6 +222,7 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
       {/* 表情覆盖层 */}
       <EmojiOverlay
         messages={emojiMessages || []}
+        players={gameState?.players || room?.players || []}
         onDismiss={onDismissEmoji || (() => {})}
       />
     </div>
