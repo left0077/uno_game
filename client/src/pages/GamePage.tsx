@@ -212,39 +212,29 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
           canPlay={gameActions.canPlay}
         />
 
-        {/* 选中操作 */}
-        {selectedCards.length > 0 && isMyTurn && (selectedCards.length === 1 || activeCombo) && (
-          <div className="flex items-center gap-3">
-            <button onClick={() => setSelectedCards([])} className="text-cream-muted text-xs">取消</button>
-            <button onClick={handleConfirmPlay}
-              className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all">
-              {activeCombo ? `${activeCombo.label} 连打` : '出牌'}
-            </button>
+        {/* 底部操作栏 */}
+        <div className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-felt-dark/95 via-felt-dark/80 to-transparent px-4 py-3 pb-6">
+          <div className="flex justify-center mb-2">
+            <EmojiBar onSend={gameActions.sendEmoji} />
           </div>
-        )}
-        {selectedCards.length > 1 && !activeCombo && isMyTurn && (
-          <div className="flex items-center gap-3">
-            <button onClick={() => setSelectedCards([])} className="text-cream-muted text-xs">取消</button>
-            <span className="text-amber-300 text-xs">{selectedCards.length}张未形成连打</span>
+          <div className="flex items-center justify-center gap-4 max-w-md mx-auto">
+            {selectedCards.length > 0 && isMyTurn && (selectedCards.length === 1 || activeCombo) && (
+              <>
+                <button onClick={() => setSelectedCards([])} className="flex-1 py-3 bg-felt-dark/60 border border-gold/20 text-cream-muted rounded-xl text-sm">取消</button>
+                <button onClick={handleConfirmPlay} className="flex-[2] py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl shadow-lg active:scale-95 text-base">{activeCombo ? `${activeCombo.label} 连打` : '出牌'}</button>
+              </>
+            )}
+            {selectedCards.length > 1 && !activeCombo && isMyTurn && (
+              <button onClick={() => setSelectedCards([])} className="w-full py-3 bg-amber-900/40 border border-amber-500/30 text-amber-300 rounded-xl text-sm">{selectedCards.length}张未形成连打 · 点击取消</button>
+            )}
+            {!(selectedCards.length > 0 && isMyTurn) && (
+              <>
+                <button onClick={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} className="flex-1 py-3 btn-soft-blue text-sm rounded-xl disabled:opacity-40 font-medium">摸牌</button>
+                <button onClick={handleCallUno} disabled={!canUno || !!myUnoCalled} className={`flex-1 py-3 text-sm rounded-xl font-bold transition-all ${myUnoCalled ? 'bg-emerald-700 text-white border border-emerald-400' : canUno ? 'btn-soft-red animate-pulse' : 'bg-felt-dark/60 text-cream-muted/40 cursor-not-allowed'}`}>{myUnoCalled ? 'UNO ✓' : 'UNO!'}</button>
+              </>
+            )}
           </div>
-        )}
-
-        {/* 操作栏 */}
-        <div className="flex items-center justify-center gap-3 pb-2">
-          <EmojiBar onSend={gameActions.sendEmoji} />
-          <button onClick={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()}
-            className="px-5 py-2 btn-soft-blue text-sm rounded-xl disabled:opacity-40">
-            摸牌
-          </button>
-          <button onClick={handleCallUno} disabled={!canUno || !!myUnoCalled}
-            className={`px-5 py-2 text-sm rounded-xl font-bold transition-all ${
-              myUnoCalled ? 'bg-emerald-700 text-white border border-emerald-400' :
-              canUno ? 'btn-soft-red animate-pulse' : 'bg-felt-dark/60 text-cream-muted/40 cursor-not-allowed'
-            }`}>
-            {myUnoCalled ? 'UNO ✓' : 'UNO!'}
-          </button>
         </div>
-      </div>
 
       {/* 弹窗 */}
       {showColorPicker && <ColorPickerModal onSelect={handleColorSelect} onCancel={() => setShowColorPicker(false)} />}
