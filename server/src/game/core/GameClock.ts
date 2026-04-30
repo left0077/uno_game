@@ -98,13 +98,21 @@ export class GameClock {
     const player = this.state.players.get(currentId);
     if (!player) return;
 
+    // 回合超时检查（所有玩家，包括真人）
+    const turnElapsed = (Date.now() - this.state.turnStartTime) / 1000;
+    if (turnElapsed >= this.turnTimer) {
+      console.log(`[GameClock] 超时: ${player.nickname}，自动摸牌`);
+      this.callbacks.onTurnTimeout(currentId);
+      return;
+    }
+
     // 非 AI 回合时清除记录
     if (!player.isAI) {
       this.lastScheduledAI = null;
       return;
     }
 
-    // AI 回合：防止对同一玩家重复调度（允许不同 AI 连续调度）
+    // AI 回合：防止对同一玩家重复调度
     if (this.lastScheduledAI !== currentId) {
       this.lastScheduledAI = currentId;
       this.callbacks.onAITurn(currentId);
