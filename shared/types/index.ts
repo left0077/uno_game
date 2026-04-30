@@ -84,6 +84,7 @@ export interface GameState {
   gameStartTime?: number; // 游戏开始时间戳（缩圈模式需要）
   humanPlayerCount?: number; // 开局真人数量（缩圈模式需要）
   phase?: 'waiting' | 'playing' | 'finished'; // 游戏阶段
+  lastPlay?: { playerId: string; type: string; cardCount: number; cards: Card[] } | null; // 最后出牌记录
 }
 
 // 游戏动作

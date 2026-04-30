@@ -635,19 +635,25 @@ function ColorPickerModal({
 function LastPlayDisplay({ lastPlay, players }: { lastPlay: any; players: any[] }) {
   if (!lastPlay || !lastPlay.cards?.length) return null;
   const player = players.find((p: any) => p.id === lastPlay.playerId);
-  const cardLabels = lastPlay.cards.map((c: any) => {
-    const colorEmoji: Record<string, string> = { red: '🔴', yellow: '🟡', green: '🟢', blue: '🔵', wild: '⚫' };
-    const emoji = colorEmoji[c?.color] || '';
-    const val = c?.type === 'number' ? c.value : (c?.type || '?');
-    return `${emoji}${val}`;
-  }).join(' ');
+  const colorEmoji: Record<string, string> = { red: '🔴', yellow: '🟡', green: '🟢', blue: '🔵', wild: '⚫' };
+  const label = (c: any) => `${colorEmoji[c?.color] || ''}${c?.type === 'number' ? c.value : (c?.type || '?')}`;
+
+  const cards = lastPlay.cards;
+  const rest = cards.slice(0, -1).map(label).join(' ');
+  const last = label(cards[cards.length - 1]);
 
   return (
     <div className="flex justify-center mb-4">
-      <span className="text-xs text-cream-muted/80">
-        {player?.nickname || '?'} 出了: {cardLabels}
-        {lastPlay.type === 'combo' && <span className="text-purple-300 ml-1">(连打)</span>}
-      </span>
+      <div className="text-xs text-cream-muted/80 text-center">
+        <div>
+          {player?.nickname || '?'} 出了:
+          {lastPlay.type === 'combo' && <span className="text-purple-300 ml-1">(连打{cards.length}张)</span>}
+        </div>
+        <div className="flex items-center justify-center gap-1 mt-0.5">
+          {rest && <span className="opacity-50">{rest}</span>}
+          <span className="text-gold-light font-bold border border-gold/30 rounded px-1">→ {last}</span>
+        </div>
+      </div>
     </div>
   );
 }
