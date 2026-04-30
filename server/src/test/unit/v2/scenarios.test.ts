@@ -42,23 +42,86 @@ describe('叠加链', () => {
 });
 
 describe('反转弹回', () => {
-  test('A出+4→B反转→惩罚弹回A', () => {
+  test('A出+2→B反转→惩罚弹回A', () => {
     const s = ScenarioBuilder.standard([
-      { id: 'A', nickname: 'A', cards: [makeCard({ id:'a1',type:'draw4',color:'wild',value:'draw4' })] },
+      { id: 'A', nickname: 'A', cards: [makeCard({ id:'a1',type:'draw2',color:'red',value:'draw2' })] },
       { id: 'B', nickname: 'B', cards: [makeCard({ id:'b1',type:'reverse',color:'red',value:'reverse' })] },
       { id: 'C', nickname: 'C', cards: [] },
     ]);
-    s.state.penaltySourceId = null as any;
+    s.play('A', 'a1');
+    expect(s.state.pendingDraw).toBe(2);
+    expect(s.state.penaltySourceId).toBe('A');
+
+    // B出反转弹回给A
+    const result = s.mode.handleAction(
+      { type: 'reverse', playerId: 'B', cardIds: ['b1'], timestamp: Date.now() }
+    );
+    expect(result.success).toBeTruthy();
+    // 惩罚还在，目标变成 A
+    expect(s.state.pendingDraw).toBe(2);
+  });
+
+  test('Ping-pong: A+2→B反转→A反转→B接受摸2张', () => {
+    const s = ScenarioBuilder.standard([
+      { id: 'A', nickname: 'A', cards: [
+        makeCard({ id:'a1',type:'draw2',color:'red',value:'draw2' }),
+        makeCard({ id:'a2',type:'reverse',color:'blue',value:'reverse' }),
+      ]},
+      { id: 'B', nickname: 'B', cards: [
+        makeCard({ id:'b1',type:'reverse',color:'red',value:'reverse' }),
+      ]},
+      { id: 'C', nickname: 'C', cards: [] },
+    ]);
+    // A出+2
+    s.play('A', 'a1');
+    expect(s.state.pendingDraw).toBe(2);
+    expect(s.state.penaltySourceId).toBe('A');
+
+    // B反转弹回给A
+    s.mode.handleAction({ type: 'reverse', playerId: 'B', cardIds: ['b1'], timestamp: Date.now() });
+    expect(s.state.pendingDraw).toBe(2);
+
+    // A再反转弹回给B
+    s.mode.handleAction({ type: 'reverse', playerId: 'A', cardIds: ['a2'], timestamp: Date.now() });
+    expect(s.state.pendingDraw).toBe(2);
+
+    // B没有反转了，接受惩罚摸2张
+    expect(s.handCount('B')).toBe(1); // 还有1张牌（reverse已出）
+    // B摸牌接受
+    s.draw('B');
+    expect(s.handCount('B')).toBe(3); // 1 + 2张惩罚
+    expect(s.state.pendingDraw).toBe(0); // 惩罚清零
+  });
+
+  test('Ping-pong 3人: A+4→B跟+4→C反转→B反转→C接受摸8张', () => {
+    const s = ScenarioBuilder.standard([
+      { id: 'A', nickname: 'A', cards: [
+        makeCard({ id:'a1',type:'draw4',color:'wild',value:'draw4' }),
+      ]},
+      { id: 'B', nickname: 'B', cards: [
+        makeCard({ id:'b1',type:'draw4',color:'wild',value:'draw4' }),
+        makeCard({ id:'b2',type:'reverse',color:'red',value:'reverse' }),
+      ]},
+      { id: 'C', nickname: 'C', cards: [
+        makeCard({ id:'c1',type:'reverse',color:'blue',value:'reverse' }),
+      ]},
+      { id: 'D', nickname: 'D', cards: [] },
+    ]);
+    // A出+4
     s.play('A', 'a1', 'red');
     expect(s.state.pendingDraw).toBe(4);
-    expect(s.state.penaltySourceId).toBe('A'); // 来源是A（上一个出牌者）
-
-    // B出反转弹回
-    const act = { type: 'reverse' as const, playerId: 'B', cardIds: ['b1'], timestamp: Date.now() };
-    const result = s.mode.handleAction(act);
-    expect(result.success).toBeTruthy();
-    // 惩罚被清除（弹回了）
-    expect(s.state.pendingDraw).toBe(4); // 弹回后还在，但目标是A
+    // B跟+4 → 累积8
+    s.play('B', 'b1', 'blue');
+    expect(s.state.pendingDraw).toBe(8);
+    // C反转弹回给B
+    s.mode.handleAction({ type: 'reverse', playerId: 'C', cardIds: ['c1'], timestamp: Date.now() });
+    expect(s.state.pendingDraw).toBe(8);
+    // B再反转弹回给C（ping-pong）
+    s.mode.handleAction({ type: 'reverse', playerId: 'B', cardIds: ['b2'], timestamp: Date.now() });
+    expect(s.state.pendingDraw).toBe(8);
+    // C没牌了，接受
+    s.draw('C');
+    expect(s.handCount('C')).toBe(8); // 0张原有 + 8张惩罚
   });
 });
 
