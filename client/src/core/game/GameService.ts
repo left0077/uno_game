@@ -261,6 +261,12 @@ export class GameService {
     this.socket.emit('game:timeout', { roomCode });
   }
 
+  sendEmoji(emoji: string): void {
+    const roomCode = this.getRoomCode();
+    if (!roomCode) return;
+    this.socket.emit('chat:send', { roomCode, type: 'emoji', content: emoji });
+  }
+
   private getRoomCode(): string | null {
     const room = this.engine.getContext().room;
     return room?.code || null;

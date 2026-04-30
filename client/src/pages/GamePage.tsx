@@ -29,6 +29,7 @@ interface GamePageProps {
     myHand: CardType[];
     comboOptions: Array<{ type: string; comboType: string; cardIds: string[]; label: string }>;
     penaltyInfo: { pendingDraw: number; penaltySourceId: string } | null;
+    sendEmoji: (emoji: string) => void;
   };
   emojiMessages?: Array<{ playerId: string; emoji: string; target?: string; timestamp: number }>;
   onDismissEmoji?: () => void;
@@ -199,6 +200,9 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
             </button>
           </div>
         )}
+
+        {/* 表情栏 */}
+        <EmojiBar onSend={gameActions.sendEmoji} />
 
         {/* 操作按钮 */}
         <GameControls
@@ -593,6 +597,20 @@ function ConnectionStatus() {
     }`}>
       <span className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-emerald-400' : 'bg-red-400'}`} />
       {online ? '在线' : '离线'}
+    </div>
+  );
+}
+
+const EMOJI_LIST = ['🤡','💀','🐉','👁️','🫠','🤌','🗿','🍵','🥱','🙏','🫡','🤯','🪿','🎭','🦧','😭'];
+
+function EmojiBar({ onSend }: { onSend: (emoji: string) => void }) {
+  return (
+    <div className="flex justify-center gap-2 mt-2 flex-wrap">
+      {EMOJI_LIST.map(e => (
+        <button key={e} onClick={() => onSend(e)}
+          className="text-xl hover:scale-125 active:scale-90 transition-transform p-1"
+        >{e}</button>
+      ))}
     </div>
   );
 }

@@ -173,6 +173,9 @@ export function useGameActions() {
     canChallenge: engine.canChallenge.bind(engine),
     requiresColorSelection: engine.requiresColorSelection.bind(engine),
 
+    // 发送表情
+    sendEmoji: (emoji: string) => gameService.sendEmoji(emoji),
+
     // 服务端推送的选项
     comboOptions,
     penaltyInfo,
