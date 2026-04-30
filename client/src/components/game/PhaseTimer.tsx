@@ -34,14 +34,15 @@ export function PhaseTimer({ gameStartTime, phaseTimes, currentPhase, turnTimer 
   const phaseUrgent = phaseNext !== null && phaseNext <= 30;
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors duration-500 border ${
+    <div className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors duration-500 border ${
       isMyTurn ? 'bg-gold/10 border-gold/30' :
       phaseUrgent ? 'bg-red-900/30 border-red-500/50' :
       'bg-felt-dark/50 border-gold/10'
     }`}>
-      <span className={`font-bold ${phaseUrgent ? 'text-red-300' : 'text-gold'}`}>P{currentPhase}</span>
-      {phaseNext !== null && <span className={`font-mono ${phaseUrgent ? 'text-red-300 animate-pulse' : 'text-cream-muted'}`}>{fmt(phaseNext)}</span>}
+      <span className="text-cream-muted/70">Phase {currentPhase}</span>
+      {phaseNext !== null && <span className={`font-mono font-bold ${phaseUrgent ? 'text-red-300 animate-pulse' : 'text-gold-light'}`}>{fmt(phaseNext)}</span>}
       <span className="text-cream-muted/30">|</span>
+      <span className="text-cream-muted/70">回合</span>
       <span className={`font-mono font-bold ${turnRemain <= 10 ? 'text-red-400' : 'text-gold-light'}`}>{fmt(turnRemain)}</span>
     </div>
   );
