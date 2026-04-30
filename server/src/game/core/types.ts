@@ -57,7 +57,11 @@ export interface GameStateV2 {
   
   /** 回合开始时间 */
   turnStartTime: number;
-  
+
+  /** Jump In 竞争窗口（出牌后下家和抢牌者同时竞争） */
+  jumpInWindow?: boolean;
+  jumpInDeadline?: number;
+
   // === 游戏时钟 ===
   /** 游戏开始时间戳（用于阶段推进和全局超时） */
   gameStartTime: number;

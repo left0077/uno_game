@@ -782,6 +782,28 @@ function serializeGameStateV2(game: V2GameInstance): any {
     gameStartTime: state.gameStartTime,
     phaseTimes: GAME_MODES.out.phases.map(p => p.at),
 
+    // Jump In 窗口
+    jumpInWindow: state.jumpInWindow || false,
+    jumpInDeadline: state.jumpInDeadline || 0,
+
+    // 最后出牌记录
+    lastPlay: state.lastAction ? {
+      playerId: state.lastAction.playerId,
+      type: state.lastAction.type,
+      cardCount: (state.lastAction.cardIds || []).length,
+      cards: (state.lastAction.cardIds || []).map(cid => {
+        for (const p of state.players.values()) {
+          const found = p.cards.find(c => c.id === cid);
+          if (found) return found;
+        }
+        // 可能已从手牌移除（出掉了），从弃牌堆找
+        for (let i = state.discardPile.length - 1; i >= 0; i--) {
+          if (state.discardPile[i].id === cid) return state.discardPile[i];
+        }
+        return null;
+      }).filter(Boolean),
+    } : null,
+
     // 元数据
     turnStartTime: state.turnStartTime,
     lastAction: state.lastAction
@@ -904,17 +926,20 @@ function detectCombos(cards: Card[]): Array<{ type: string; cardIds: string[]; l
     }
   }
 
-  // 对子/三条（同数字，颜色任意）
+  // 对子/三条/炸弹/核弹（同数字，颜色任意）
   for (const [, cards] of byValue) {
     if (cards.length >= 2) {
       results.push({ type: 'pair', cardIds: [cards[0].id, cards[1].id], label: `对子${cards[0].value}` });
-      // 多张同数字时可提供不同组合
       if (cards.length >= 3) {
         results.push({ type: 'pair', cardIds: [cards[1].id, cards[2].id], label: `对子${cards[0].value}` });
         results.push({ type: 'three', cardIds: cards.slice(0, 3).map(c => c.id), label: `三条${cards[0].value}` });
       }
       if (cards.length >= 4) {
         results.push({ type: 'pair', cardIds: [cards[2].id, cards[3].id], label: `对子${cards[0].value}` });
+        results.push({ type: 'three', cardIds: cards.slice(0, 4).map(c => c.id), label: `💣炸弹${cards[0].value}` });
+      }
+      if (cards.length >= 5) {
+        results.push({ type: 'three', cardIds: cards.slice(0, 5).map(c => c.id), label: `☢️核弹${cards[0].value}` });
       }
     }
   }

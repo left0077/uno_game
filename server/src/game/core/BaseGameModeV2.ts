@@ -141,9 +141,13 @@ export abstract class BaseGameModeV2 {
   
   protected validatePlayCard(action: GameActionV2): ValidationResult {
     const { playerId, cardIds } = action;
-    
-    // 必须是当前玩家回合
-    if (this.playerManager.getCurrentPlayerId() !== playerId) {
+
+    // Jump In 窗口期内：下家和其他人都可以出牌（竞速）
+    const inJumpWindow = this.state.jumpInWindow &&
+      this.state.jumpInDeadline && Date.now() < this.state.jumpInDeadline;
+
+    // 正常回合检查
+    if (!inJumpWindow && this.playerManager.getCurrentPlayerId() !== playerId) {
       return { valid: false, error: 'Not your turn' };
     }
     
@@ -313,9 +317,19 @@ export abstract class BaseGameModeV2 {
     
     // 应用牌效果
     this.applyCardEffect(card, playerId);
-    
+
+    // 关闭 Jump In 窗口（动作已执行）
+    this.state.jumpInWindow = false;
+    this.state.jumpInDeadline = undefined;
+
     // 流转回合
     this.playerManager.nextTurn();
+
+    // 开启 Jump In 竞争窗口（3秒，下家和抢牌者同时竞争）
+    if (this.config.allowJumpIn) {
+      this.state.jumpInWindow = true;
+      this.state.jumpInDeadline = Date.now() + 3000;
+    }
   }
   
   /**
@@ -335,6 +349,12 @@ export abstract class BaseGameModeV2 {
 
     // 流转回合
     this.playerManager.nextTurn();
+
+    // 开启 Jump In 竞争窗口（3秒，下家和抢牌者同时竞争）
+    if (this.config.allowJumpIn) {
+      this.state.jumpInWindow = true;
+      this.state.jumpInDeadline = Date.now() + 3000;
+    }
   }
   
   /**

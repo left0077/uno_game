@@ -97,10 +97,11 @@ export class OutModeV2 extends BaseGameModeV2 {
   }
 
   private validateThree(cards: Card[]): ValidationResult {
-    if (cards.length !== 3) return { valid: false, error: '三连需要3张牌' };
+    if (cards.length < 3 || cards.length > 5) return { valid: false, error: '三连需要3-5张牌' };
     if (cards.some(c => c.type === 'wild' || c.type === 'draw4'))
       return { valid: false, error: '万能牌不能参与连打' };
-    if (cards[0].value !== cards[1].value || cards[1].value !== cards[2].value)
+    const val = cards[0].value;
+    if (!cards.every(c => c.value === val))
       return { valid: false, error: '三连需要数字相同' };
     return { valid: true };
   }
@@ -173,9 +174,20 @@ export class OutModeV2 extends BaseGameModeV2 {
       case 'pair':
         break; // 对子：无效果
       case 'three': {
-        // 三条：下家跳过
+        // 三条/炸弹/核弹：下家跳过 + 张数递增惩罚
         const nextId = this.playerManager.getNextPlayerId();
         if (nextId) this.state.skippedPlayerId = nextId;
+        const n = straightLength || 3;
+        if (n >= 5) {
+          // 核弹：所有其他玩家各摸 3 张
+          const source = this.playerManager.getCurrentPlayerId();
+          for (const pid of this.state.tablePlayerIds) {
+            if (pid !== source) this.drawCardsForPlayer(pid, 3);
+          }
+        } else if (n >= 4) {
+          // 炸弹：下家摸 2 张
+          this.state.pendingDraw = (this.state.pendingDraw || 0) + 2;
+        }
         break;
       }
       case 'rainbow':

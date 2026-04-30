@@ -162,6 +162,14 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
           currentPlayerId={gameState.currentPlayerId}
         />
 
+        {/* 最后出牌记录 */}
+        {gameState.lastPlay && (
+          <LastPlayDisplay
+            lastPlay={gameState.lastPlay}
+            players={gameState.players || room?.players || []}
+          />
+        )}
+
         {/* 牌堆区域 */}
         <div className="flex justify-center items-center gap-8 my-8">
           {/* 弃牌堆 */}
@@ -500,9 +508,19 @@ function MyHand({
 }) {
   if (cards.length === 0) return null;
 
+  // 按颜色分组，组内按数字排序
+  const colorOrder = ['red', 'yellow', 'green', 'blue', 'wild'];
+  const sorted = [...cards].sort((a, b) => {
+    const ci = colorOrder.indexOf(a.color) - colorOrder.indexOf(b.color);
+    if (ci !== 0) return ci;
+    const va = typeof a.value === 'number' ? a.value : 99;
+    const vb = typeof b.value === 'number' ? b.value : 99;
+    return va - vb;
+  });
+
   return (
     <div className="flex justify-center items-end gap-0.5 sm:gap-1 py-3 sm:py-4 overflow-x-auto px-2">
-      {cards.map((card, idx) => {
+      {sorted.map((card, idx) => {
         const playable = isMyTurn && canPlay(card.id);
         const isCombo = comboCards.has(card.id);
         const isSelectable = playable || isCombo;
@@ -610,6 +628,26 @@ function ColorPickerModal({
           取消
         </button>
       </div>
+    </div>
+  );
+}
+
+function LastPlayDisplay({ lastPlay, players }: { lastPlay: any; players: any[] }) {
+  if (!lastPlay || !lastPlay.cards?.length) return null;
+  const player = players.find((p: any) => p.id === lastPlay.playerId);
+  const cardLabels = lastPlay.cards.map((c: any) => {
+    const colorEmoji: Record<string, string> = { red: '🔴', yellow: '🟡', green: '🟢', blue: '🔵', wild: '⚫' };
+    const emoji = colorEmoji[c?.color] || '';
+    const val = c?.type === 'number' ? c.value : (c?.type || '?');
+    return `${emoji}${val}`;
+  }).join(' ');
+
+  return (
+    <div className="flex justify-center mb-4">
+      <span className="text-xs text-cream-muted/80">
+        {player?.nickname || '?'} 出了: {cardLabels}
+        {lastPlay.type === 'combo' && <span className="text-purple-300 ml-1">(连打)</span>}
+      </span>
     </div>
   );
 }

@@ -72,6 +72,13 @@ export class GameClock {
       return;
     }
 
+    // Jump In 窗口超时检查
+    if (this.state.jumpInWindow && this.state.jumpInDeadline && Date.now() > this.state.jumpInDeadline) {
+      this.state.jumpInWindow = false;
+      this.state.jumpInDeadline = undefined;
+      console.log(`[GameClock] Jump In窗口关闭，轮到 ${this.state.players.get(this.state.tablePlayerIds[this.state.currentPlayerIndex])?.nickname}`);
+    }
+
     this.checkTurnTimeout(elapsed);
   }
 
