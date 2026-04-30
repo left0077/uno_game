@@ -30,6 +30,7 @@ interface GamePageProps {
     comboOptions: Array<{ type: string; comboType: string; cardIds: string[]; label: string }>;
     penaltyInfo: { pendingDraw: number; penaltySourceId: string } | null;
     sendEmoji: (emoji: string) => void;
+    challengePlayer: (targetId: string) => boolean;
   };
   emojiMessages?: Array<{ playerId: string; emoji: string; target?: string; timestamp: number }>;
   onDismissEmoji?: () => void;
@@ -174,7 +175,7 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
       </div>
 
       {/* ====== 玩家头像行 ====== */}
-      <OtherPlayers players={gameState.players || room.players} currentPlayerId={gameState.currentPlayerId} penaltyStats={(gameState as any).penaltyStats || {}} />
+      <OtherPlayers players={gameState.players || room.players} currentPlayerId={gameState.currentPlayerId} penaltyStats={(gameState as any).penaltyStats || {}} onChallenge={(id: string) => gameActions.challengePlayer(id)} />
 
       {/* ====== 主游戏区 ====== */}
       <div className="flex-1 flex flex-col items-center justify-center px-2 gap-3 max-w-lg mx-auto w-full">
@@ -249,11 +250,13 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
 function OtherPlayers({
   players,
   currentPlayerId,
-  penaltyStats
+  penaltyStats,
+  onChallenge
 }: {
   players: { id: string; nickname: string; cardCount?: number; isAI?: boolean; status?: string; eliminated?: boolean; hasCalledUno?: boolean }[];
   currentPlayerId: string;
   penaltyStats: Record<string, number>;
+  onChallenge: (id: string) => boolean;
 }) {
   return (
     <div className="flex justify-center gap-1.5 sm:gap-3 flex-wrap px-1">
@@ -299,6 +302,9 @@ function OtherPlayers({
               )}
               {(player.hasCalledUno || player.cardCount === 1) && (
                 <span className="text-[10px] bg-red-600 text-white px-1 rounded font-bold animate-pulse">UNO!</span>
+              )}
+              {player.cardCount === 1 && !player.hasCalledUno && player.id !== currentPlayerId && (
+                <button onClick={() => onChallenge(player.id)} className="text-[10px] bg-yellow-600 text-white px-1 rounded font-bold hover:bg-yellow-500">质疑</button>
               )}
             </div>
             <div className="text-cream-muted/60 text-[10px] sm:text-xs text-center mt-0.5">
