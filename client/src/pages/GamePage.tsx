@@ -164,9 +164,8 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
         </div>
         <div className="flex items-center gap-3">
           {gameState.outState && gameState.gameStartTime && (
-            <PhaseTimer gameStartTime={gameState.gameStartTime} phaseTimes={(gameState as any).phaseTimes || [180, 360, 540]} currentPhase={gameState.outState.phase} maxCards={gameState.outState.maxCards} />
+            <PhaseTimer gameStartTime={gameState.gameStartTime} phaseTimes={(gameState as any).phaseTimes || [180, 360, 540]} currentPhase={gameState.outState.phase} maxCards={gameState.outState.maxCards} turnTimer={gameState.turnTimer} turnStartTime={gameState.turnStartTime} isMyTurn={isMyTurn} />
           )}
-          <TurnTimer turnTimer={gameState.turnTimer} turnStartTime={gameState.turnStartTime} isMyTurn={isMyTurn} />
           <button onClick={onLeaveRoom} className="btn-soft-red px-3 py-1 text-xs rounded-lg">离开</button>
         </div>
       </div>
