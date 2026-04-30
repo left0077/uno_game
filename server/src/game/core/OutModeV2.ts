@@ -91,8 +91,8 @@ export class OutModeV2 extends BaseGameModeV2 {
     if (cards.some(c => c.type === 'wild' || c.type === 'draw4'))
       return { valid: false, error: '万能牌不能参与连打' };
     const [c1, c2] = cards;
-    if (c1.color !== c2.color && c1.value !== c2.value)
-      return { valid: false, error: '对子需要同色或同值' };
+    if (c1.value !== c2.value)
+      return { valid: false, error: '对子需要数字相同' };
     return { valid: true };
   }
 
