@@ -72,43 +72,47 @@ export class SocketClient {
 
   // 连接服务器
   connect(userId?: string, nickname?: string): void {
-    if (this.socket?.connected) return;
-
-    this.socket = io(this.url, {
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
-
-    this.socket.on('connect', () => {
-      console.log('[SocketClient] Connected');
-      this.isConnected = true;
-      
-      // 发送认证信息
-      const deviceId = localStorage.getItem('uno-device-id') || `guest_${Date.now()}`;
-      const savedName = localStorage.getItem('uno-nickname') || '玩家';
-      this.socket?.emit('auth', {
-        userId: userId || deviceId,
-        nickname: nickname || savedName
+    if (!this.socket) {
+      this.socket = io(this.url, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
       });
-      
+
+      this.socket.on('connect', () => {
+        console.log('[SocketClient] Connected');
+        this.isConnected = true;
+
+        const deviceId = localStorage.getItem('uno-device-id') || `guest_${Date.now()}`;
+        const savedName = localStorage.getItem('uno-nickname') || '玩家';
+        this.socket?.emit('auth', {
+          userId: userId || deviceId,
+          nickname: nickname || savedName
+        });
+
+        this.emitInternal('connect', undefined);
+      });
+
+      this.socket.on('disconnect', () => {
+        console.log('[SocketClient] Disconnected');
+        this.isConnected = false;
+        this.emitInternal('disconnect', undefined);
+      });
+
+      this.socket.on('connect_error', (err) => {
+        console.error('[SocketClient] Error:', err);
+        this.emitInternal('connect_error', err);
+      });
+
+      this.bindEvents();
+    }
+
+    // 已经连接：直接触发 connect 事件让上层初始化
+    if (this.socket?.connected) {
+      this.isConnected = true;
       this.emitInternal('connect', undefined);
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('[SocketClient] Disconnected');
-      this.isConnected = false;
-      this.emitInternal('disconnect', undefined);
-    });
-
-    this.socket.on('connect_error', (err) => {
-      console.error('[SocketClient] Error:', err);
-      this.emitInternal('connect_error', err);
-    });
-
-    // 绑定所有事件
-    this.bindEvents();
+    }
   }
 
   // 断开连接
