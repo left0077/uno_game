@@ -160,10 +160,10 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
         <div className="flex items-center gap-2">
           <span className="text-cream-muted text-xs">房间</span>
           <span className="font-mono font-bold text-gold-light text-sm">{room.code}</span>
-          <span className="text-gold text-xs">{typeof gameState.direction === 'string' ? (gameState.direction === 'clockwise' ? '→' : '←') : gameState.direction === 1 ? '→' : '←'}</span>
           <ConnectionStatus />
         </div>
-        <div className="flex justify-center">
+        <div className="flex justify-center items-center gap-2">
+          <span className="text-gold font-bold text-lg">{typeof gameState.direction === 'string' ? (gameState.direction === 'clockwise' ? '→' : '←') : gameState.direction === 1 ? '→' : '←'}</span>
           {gameState.outState && gameState.gameStartTime && (
             <PhaseTimer gameStartTime={gameState.gameStartTime} phaseTimes={(gameState as any).phaseTimes || [180, 360, 540]} currentPhase={gameState.outState.phase} maxCards={gameState.outState.maxCards} turnTimer={gameState.turnTimer} turnStartTime={gameState.turnStartTime} isMyTurn={isMyTurn} />
           )}
