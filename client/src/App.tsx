@@ -146,6 +146,14 @@ function App() {
   const roomActions = useRoomActions();
   const gameActions = useGameActions();
 
+  // E2E 测试辅助：暴露 store 方法到 window
+  useEffect(() => {
+    (window as any).__E2E__ = {
+      setNickname: store.setNickname,
+      getState: () => useGameStore.getState(),
+    };
+  }, [store]);
+
   // 渲染页面 - 带过渡动画
   return (
     <div className="min-h-screen bg-casino relative overflow-hidden">
