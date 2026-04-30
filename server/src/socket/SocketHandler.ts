@@ -633,11 +633,9 @@ export function setupSocketHandlers(io: Server): void {
       
       if (success) {
         broadcastGameStateV2(io, data.roomCode, game);
+        io.to(data.roomCode).emit('game:event', { type: 'uno_called', playerId: action.playerId });
       } else {
-        socket.emit(SocketEvents.ERROR, { 
-          action,
-          reason: 'INVALID_ACTION'
-        });
+        socket.emit(SocketEvents.ERROR, { action, reason: 'INVALID_ACTION' });
       }
     });
 
@@ -661,11 +659,15 @@ export function setupSocketHandlers(io: Server): void {
       
       if (success) {
         broadcastGameStateV2(io, data.roomCode, game);
-      } else {
-        socket.emit(SocketEvents.ERROR, { 
-          action,
-          reason: 'INVALID_ACTION'
+        const challengedPlayer = game.state.players.get(action.targetId || '');
+        io.to(data.roomCode).emit('game:event', {
+          type: 'challenge_success',
+          challengerId: action.playerId,
+          targetId: action.targetId,
+          targetName: challengedPlayer?.nickname || ''
         });
+      } else {
+        socket.emit(SocketEvents.ERROR, { action, reason: 'INVALID_ACTION' });
       }
     });
 

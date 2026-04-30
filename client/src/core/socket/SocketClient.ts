@@ -56,6 +56,8 @@ export interface SocketEvents {
   // 聊天事件
   'chat:message': any;
 
+  'game:event': { type: string; [key: string]: any };
+
   // 错误事件
   'error': { code: string; message: string };
 }
@@ -189,6 +191,9 @@ export class SocketClient {
     this.socket.on('game:state', (data) => this.emitInternal('game:state', data));
     this.socket.on('game:ended', (data) => this.emitInternal('game:ended', data));
     
+    // 游戏事件（非状态同步，用于UI反馈）
+    this.socket.on('game:event', (data) => this.emitInternal('game:event', data));
+
     // 玩家个人事件
     this.socket.on('player:turn', (data) => this.emitInternal('player:turn', data));
     this.socket.on('player:hand', (data) => this.emitInternal('player:hand', data));

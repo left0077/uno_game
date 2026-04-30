@@ -122,6 +122,10 @@ function App() {
     onGameState: handleGameState,
     onGameError: handleError,
     onChatMessage: handleChatMessage,
+    onGameEvent: (data: any) => {
+      if (data.type === 'uno_called') store.setError('UNO!');
+      if (data.type === 'challenge_success') store.setError(`质疑成功! ${data.targetName || ''}罚2张`);
+    },
   }), [handleGameStarted, handleGameEnded, handleGameState, handleError, handleChatMessage]);
 
   // 使用 Socket hook
