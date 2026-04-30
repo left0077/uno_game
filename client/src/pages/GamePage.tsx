@@ -51,8 +51,21 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   const comboOptions = gameActions.comboOptions || [];
   const penaltyInfo = gameActions.penaltyInfo;
 
-  // 连打可选牌集合（紫色高亮）
-  const comboCards = new Set(comboOptions.flatMap((c: any) => c.cardIds || []));
+  // 选中的可单出牌
+  const selectedPlayable = selectedCards.filter(id => canPlay(id));
+
+  // 连打候选：只有选中一张可单出牌后，才显示与其相关的连打牌
+  const comboCards = new Set<string>();
+  if (selectedPlayable.length === 1 && comboOptions.length > 0) {
+    const seed = selectedPlayable[0];
+    for (const c of comboOptions) {
+      if (c.cardIds.includes(seed)) {
+        for (const id of c.cardIds) {
+          if (!canPlay(id)) comboCards.add(id);
+        }
+      }
+    }
+  }
 
   // 当前选中的牌是否构成了有效连打
   const activeCombo = comboOptions.find(c =>
@@ -68,15 +81,16 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   // 点击牌：选中/取消
   const handleCardClick = useCallback((cardId: string) => {
     if (!isMyTurn) return;
-    if (!canPlay(cardId)) return;
+
+    const isSelectable = canPlay(cardId) || comboCards.has(cardId);
+    if (!isSelectable) return;
 
     setSelectedCards(prev => {
       if (prev.includes(cardId)) return prev.filter(id => id !== cardId);
-      // 有惩罚时只能选一张
       if (pendingDraw > 0) return [cardId];
       return [...prev, cardId];
     });
-  }, [isMyTurn, canPlay, pendingDraw]);
+  }, [isMyTurn, canPlay, pendingDraw, comboCards]);
 
   // 确认出牌
   const handleConfirmPlay = useCallback(() => {
@@ -661,7 +675,8 @@ function TurnTimer({ turnTimer, turnStartTime, isMyTurn }: { turnTimer?: number;
   );
 }
 
-function StatusHint({ isMyTurn, pendingDraw, hasPlayable }: { isMyTurn: boolean; pendingDraw: number; hasPlayable: boolean }) {
+function StatusHint({ isMyTurn, pendingDraw, hasPlayable, error }: { isMyTurn: boolean; pendingDraw: number; hasPlayable: boolean; error?: string }) {
+  if (error) return <div className="text-red-300 text-xs animate-pulse bg-red-900/30 px-3 py-1 rounded-full">{error}</div>;
   if (!isMyTurn) return <div className="text-cream-muted/50 text-xs">等待其他玩家...</div>;
   if (pendingDraw > 0) return <div className="text-red-300 text-xs font-bold animate-pulse">惩罚 +{pendingDraw} 张！跟牌或摸牌</div>;
   if (!hasPlayable) return <div className="text-amber-300 text-xs">无牌可出 · 点击牌堆摸牌</div>;
