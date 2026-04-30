@@ -910,13 +910,7 @@ function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): an
           cardIds: combo.cardIds,
           label: combo.label,
         });
-        // 连打中的每张牌也标记为可选（即使单独不能出）
-        for (const cid of combo.cardIds) {
-          if (!alreadyPlayable.has(cid)) {
-            actions.push({ type: 'play', cardId: cid, comboPart: true });
-            alreadyPlayable.add(cid);
-          }
-        }
+        // 不单独发送连打牌为 play action——客户端从 combo 数组中自行计算候选牌
       }
     }
 

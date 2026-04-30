@@ -264,12 +264,16 @@ function OtherPlayers({
         const isCurrent = player.id === currentPlayerId;
         const isFinished = player.status === 'finished';
         const isEliminated = player.eliminated;
+        const canChallenge = player.cardCount === 1 && !player.hasCalledUno && player.id !== currentPlayerId;
 
         return (
           <div
             key={player.id}
+            onClick={canChallenge ? () => onChallenge(player.id) : undefined}
             className={`relative px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border transition-all ${
-              isCurrent
+              canChallenge
+                ? 'bg-yellow-600/30 border-yellow-400/60 cursor-pointer hover:bg-yellow-500/40 animate-pulse'
+                : isCurrent
                 ? 'bg-gold/20 border-gold/50 shadow-lg shadow-gold/10 scale-105'
                 : isFinished
                 ? 'bg-emerald-900/30 border-emerald-500/40'
@@ -302,9 +306,6 @@ function OtherPlayers({
               )}
               {(player.hasCalledUno || player.cardCount === 1) && (
                 <span className="text-[10px] bg-red-600 text-white px-1 rounded font-bold animate-pulse">UNO!</span>
-              )}
-              {player.cardCount === 1 && !player.hasCalledUno && player.id !== currentPlayerId && (
-                <button onClick={() => onChallenge(player.id)} className="text-[10px] bg-yellow-600 text-white px-1 rounded font-bold hover:bg-yellow-500">质疑</button>
               )}
             </div>
             <div className="text-cream-muted/60 text-[10px] sm:text-xs text-center mt-0.5">
