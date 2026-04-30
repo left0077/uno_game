@@ -153,6 +153,8 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   const lastPlay = (gameState as any).lastPlay;
   const canUno = gameActions.myHand.length <= 2;
   const myUnoCalled = room?.players.find(p => p.id === store.userId)?.hasCalledUno;
+  const [unoClicked, setUnoClicked] = useState(false);
+  const handleClickUno = () => { setUnoClicked(true); gameActions.callUno(); setTimeout(() => setUnoClicked(false), 1000); };
 
   return (
     <div className="min-h-screen bg-casino flex flex-col relative z-10">
@@ -233,7 +235,11 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
             {!(selectedCards.length > 0 && isMyTurn) && (
               <>
                 <button onClick={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} className="flex-1 py-3 btn-soft-blue text-sm rounded-xl disabled:opacity-40 font-medium">摸牌</button>
-                <button onClick={handleCallUno} disabled={!canUno || !!myUnoCalled} className={`flex-1 py-3 text-sm rounded-xl font-bold transition-all ${myUnoCalled ? 'bg-emerald-700 text-white border border-emerald-400' : canUno ? 'btn-soft-red animate-pulse' : 'bg-felt-dark/60 text-cream-muted/40 cursor-not-allowed'}`}>{myUnoCalled ? 'UNO ✓' : 'UNO!'}</button>
+                <button onClick={handleClickUno} disabled={!canUno || !!myUnoCalled || unoClicked} className={`flex-1 py-3 text-sm rounded-xl font-bold transition-all ${
+                  myUnoCalled ? 'bg-emerald-700 text-white border border-emerald-400' :
+                  unoClicked ? 'bg-yellow-500 text-black scale-95' :
+                  canUno ? 'btn-soft-red animate-pulse' : 'bg-felt-dark/60 text-cream-muted/40 cursor-not-allowed'
+                }`}>{myUnoCalled ? 'UNO ✓' : unoClicked ? '已喊!' : 'UNO!'}</button>
               </>
             )}
           </div>
@@ -304,7 +310,7 @@ function OtherPlayers({
               {player.isAI && (
                 <span className="text-[10px] text-blue-300/70">AI</span>
               )}
-              {(player.hasCalledUno || player.cardCount === 1) && (
+              {player.hasCalledUno && (
                 <span className="text-[10px] bg-red-600 text-white px-1 rounded font-bold animate-pulse">UNO!</span>
               )}
             </div>
