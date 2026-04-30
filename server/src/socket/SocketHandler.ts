@@ -380,8 +380,17 @@ export function setupSocketHandlers(io: Server): void {
                       timestamp: Date.now()
                     };
                   } else {
-                    // 无可用动作，强制摸牌
-                    action = { type: 'draw', playerId, timestamp: Date.now() };
+                    // 无可用动作，强制摸牌 + 推进（不验证，避免竞态）
+                    const p = state.players.get(playerId);
+                    if (p) {
+                      const cards = state.deck.splice(-1, 1);
+                      if (cards.length) { p.cards.push(cards[0]); p.cardCount = p.cards.length; }
+                    }
+                    state.pendingDraw = 0;
+                    state.jumpInWindow = false;
+                    game.playerManager.nextTurn();
+                    broadcastGameStateV2(io, data.roomCode, gameInstance);
+                    return; // 跳过后续 handleAction
                   }
 
                   console.log(`[AI] ${player.nickname} 执行: ${action.type}` +
@@ -396,13 +405,18 @@ export function setupSocketHandlers(io: Server): void {
                     }
                   } else {
                     // AI 动作被拒绝，强制摸牌兜底
-                    console.log(`[AI] ${player.nickname} 动作被拒，兜底摸牌: ${result.error?.message}`);
-                    const fallback = mode.handleAction({
-                      type: 'draw', playerId, timestamp: Date.now()
-                    });
-                    if (fallback.success) {
-                      broadcastGameStateV2(io, data.roomCode, gameInstance);
+                    console.log(`[AI] ${player.nickname} 动作被拒: ${result.error?.message}`);
+                    // 直接操作状态规避验证失败（竞态：回合可能在延迟期间变了）
+                    const p = state.players.get(playerId);
+                    if (p) {
+                      const cards = state.deck.splice(-1, 1);
+                      if (cards.length) { p.cards.push(cards[0]); p.cardCount = p.cards.length; }
                     }
+                    state.pendingDraw = 0;
+                    state.pendingDrawType = undefined;
+                    state.jumpInWindow = false;
+                    game.playerManager.nextTurn();
+                    broadcastGameStateV2(io, data.roomCode, gameInstance);
                   }
                 }, delay);
               },
@@ -709,6 +723,22 @@ function broadcastGameStateV2(io: Server, roomCode: string, game: V2GameInstance
   const state = serializeGameStateV2(game);
   io.to(roomCode).emit('game:state', state);
 
+  // 为已完成的玩家发送空手牌
+  for (const pid of game.state.finishedPlayerIds) {
+    if (!pid) continue;
+    const fp = game.state.players.get(pid);
+    if (!fp) continue;
+    const roomSockets = io.sockets.adapter.rooms.get(roomCode);
+    if (!roomSockets) continue;
+    for (const sid of roomSockets) {
+      const s = io.sockets.sockets.get(sid);
+      if (s && socketUserMap.get(sid) === pid) {
+        s.emit('player:turn', { playerId: pid, cards: [], cardCount: 0, actions: [] });
+        break;
+      }
+    }
+  }
+
   // 为每个玩家单独发送手牌 + 可用动作
   for (const playerId of game.state.tablePlayerIds) {
     const player = game.state.players.get(playerId);
@@ -900,9 +930,17 @@ function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): an
     }
 
     actions.push({ type: 'draw' });
+  }
 
-    if (player.cards.length <= 2) {
-      actions.push({ type: 'uno' });
+  // UNO 可随时喊（不限于自己的回合）
+  if (player.cards.length <= 2) {
+    actions.push({ type: 'uno' });
+  }
+
+  // Challenge 可随时质疑（任何人手牌=1且未喊UNO）
+  for (const [pid, p] of game.state.players) {
+    if (pid !== playerId && p.cards.length === 1 && !p.hasCalledUno) {
+      actions.push({ type: 'challenge', targetId: pid });
     }
   }
 
