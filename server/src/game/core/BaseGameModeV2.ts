@@ -507,8 +507,10 @@ export abstract class BaseGameModeV2 {
   protected canStackCard(card: Card): boolean {
     if (!this.config.allowStacking) return false;
     if (!this.state.pendingDrawType) return false;
-    
-    return card.type === this.state.pendingDrawType;
+    // 任意 + 类型牌都可以叠（跨类型叠加）
+    return card.type === 'draw2' || card.type === 'draw3' ||
+           card.type === 'draw4' || card.type === 'draw5' ||
+           card.type === 'draw8';
   }
   
   /**

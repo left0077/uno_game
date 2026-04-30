@@ -155,24 +155,17 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   return (
     <div className="min-h-screen bg-casino flex flex-col relative z-10">
       {/* ====== 顶部栏 ====== */}
-      <div className="flex items-center justify-between px-3 py-2 casino-card mx-2 mt-2 gap-2 flex-wrap">
+      <div className="flex items-center justify-between px-3 py-2 casino-card mx-2 mt-2 gap-2">
         <div className="flex items-center gap-2">
           <span className="text-cream-muted text-xs">房间</span>
           <span className="font-mono font-bold text-gold-light text-sm">{room.code}</span>
-          <span className="text-gold text-xs ml-1">{typeof gameState.direction === 'string' ? (gameState.direction === 'clockwise' ? '→' : '←') : gameState.direction === 1 ? '→' : '←'}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          {gameState.outState && gameState.gameStartTime && (
-            <PhaseTimer
-              gameStartTime={gameState.gameStartTime}
-              phaseTimes={(gameState as any).phaseTimes || [180, 360, 540]}
-              currentPhase={gameState.outState.phase}
-              maxCards={gameState.outState.maxCards}
-            />
-          )}
+          <span className="text-gold text-xs">{typeof gameState.direction === 'string' ? (gameState.direction === 'clockwise' ? '→' : '←') : gameState.direction === 1 ? '→' : '←'}</span>
           <ConnectionStatus />
         </div>
         <div className="flex items-center gap-3">
+          {gameState.outState && gameState.gameStartTime && (
+            <PhaseTimer gameStartTime={gameState.gameStartTime} phaseTimes={(gameState as any).phaseTimes || [180, 360, 540]} currentPhase={gameState.outState.phase} maxCards={gameState.outState.maxCards} />
+          )}
           <TurnTimer turnTimer={gameState.turnTimer} turnStartTime={gameState.turnStartTime} isMyTurn={isMyTurn} />
           <button onClick={onLeaveRoom} className="btn-soft-red px-3 py-1 text-xs rounded-lg">离开</button>
         </div>
