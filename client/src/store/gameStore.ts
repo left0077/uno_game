@@ -68,7 +68,7 @@ export const useGameStore = create<GameStore>()(
   persist(
     (set, _get) => ({
       // 初始值
-      serverUrl: import.meta.env.VITE_SERVER_URL || 'http://localhost:3001',
+      serverUrl: import.meta.env.VITE_SOCKET_URL || 'https://uno-server-jbbr.onrender.com',
       userId: generateUUID(),
       nickname: '',
       room: null,
