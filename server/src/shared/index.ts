@@ -126,42 +126,37 @@ export interface ChatMessage {
 
 // Socket 事件类型
 export enum SocketEvents {
-  // 连接
-  CONNECT = 'connect',
-  DISCONNECT = 'disconnect',
-  
   // 房间
   CREATE_ROOM = 'room:create',
   JOIN_ROOM = 'room:join',
   LEAVE_ROOM = 'room:leave',
   ROOM_UPDATED = 'room:updated',
-  PLAYER_JOINED = 'room:playerJoined',
-  PLAYER_LEFT = 'room:playerLeft',
   ROOM_SETTINGS = 'room:settings',
   ROOM_START = 'room:start',
-  
-  // 游戏
-  GAME_STATE = 'game:state',
+
+  // 游戏动作 (Client→Server)
   GAME_PLAY = 'game:play',
   GAME_COMBO = 'game:combo',
   GAME_DRAW = 'game:draw',
   GAME_UNO = 'game:uno',
   GAME_CHALLENGE = 'game:challenge',
   GAME_JUMP = 'game:jump',
-  
+
+  // 游戏状态 (Server→Client)
+  GAME_STATE = 'game:state',
+
   // AI
   ADD_AI = 'ai:add',
   REMOVE_AI = 'ai:remove',
-  
+
   // 玩家
   PLAYER_ACTIONS = 'player:actions',
   PLAYER_HOST = 'player:host',
-  
+
   // 聊天
   CHAT_SEND = 'chat:send',
   CHAT_MESSAGE = 'chat:message',
-  
-  // 错误
+
   ERROR = 'error',
 }
 
