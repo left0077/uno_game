@@ -40,7 +40,7 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   const store = useGameStore();
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [pendingCardId, setPendingCardId] = useState<string | null>(null);
-  const [selectedCards, setSelectedCards] = useState<string[]>([]);
+  const [selectedCards, setSelectedCards] = useState<string[]>([]); // 按点击顺序排列，最后一张决定跟牌
 
   const gameState = store.gameState;
   const room = store.room;
@@ -525,13 +525,22 @@ function MyHand({
         const isCombo = comboCards.has(card.id);
         const isSelectable = playable || isCombo;
         const isSelected = selectedCards.includes(card.id);
+        const selIndex = selectedCards.indexOf(card.id);
+        const isLastSelected = isSelected && selIndex === selectedCards.length - 1;
 
         return (
           <div
             key={card.id}
-            className="flex-shrink-0 -mx-1 sm:-mx-0.5 first:ml-0 last:mr-0"
+            className="relative flex-shrink-0 -mx-1 sm:-mx-0.5 first:ml-0 last:mr-0"
             style={{ zIndex: isSelectable ? 10 + idx : idx }}
           >
+            {/* 选中序号 + 尾牌标识 */}
+            {isSelected && selectedCards.length > 1 && (
+              <div className={`absolute -top-2 left-1/2 -translate-x-1/2 z-30 px-1.5 py-0.5 rounded-full text-[10px] font-bold
+                ${isLastSelected ? 'bg-gold text-black' : 'bg-white/20 text-white'}`}>
+                {isLastSelected ? '→尾' : selIndex + 1}
+              </div>
+            )}
             <Card
               card={card}
               size={cards.length > 10 ? 'sm' : 'md'}
