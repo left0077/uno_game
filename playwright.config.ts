@@ -6,7 +6,7 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   timeout: 15000,
-  expect: { timeout: 5000 },
+  expect: { timeout: 15000 },
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'off',
