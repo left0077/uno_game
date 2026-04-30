@@ -6,6 +6,7 @@ interface CardProps {
   size?: 'sm' | 'md' | 'lg';
   isSelected?: boolean;
   isPlayable?: boolean;
+  isComboPart?: boolean;
   isBack?: boolean;
   onClick?: () => void;
   disabled?: boolean;
@@ -43,11 +44,12 @@ const colorClasses: Record<string, string> = {
   wild: 'uno-card-wild'
 };
 
-export function Card({ 
-  card, 
-  size = 'md', 
-  isSelected = false, 
+export function Card({
+  card,
+  size = 'md',
+  isSelected = false,
   isPlayable = false,
+  isComboPart = false,
   isBack = false,
   onClick,
   disabled = false
@@ -126,6 +128,7 @@ export function Card({
         select-none
         ${isSelected ? 'uno-card-selected' : ''}
         ${isPlayable && !isSelected ? 'uno-card-playable' : ''}
+        ${isComboPart && !isSelected ? 'uno-card-combo' : ''}
         ${disabled ? 'uno-card-disabled' : isSelected ? '' : 'uno-card-hover'}
       `}
       onClick={!disabled ? onClick : undefined}

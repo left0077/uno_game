@@ -229,6 +229,19 @@
     }
   }
   
+  /* 连打候选牌 - 紫色光环 */
+  .uno-card-combo {
+    box-shadow:
+      0 0 0 3px rgba(168, 85, 247, 0.6),
+      0 10px 15px -3px rgba(168, 85, 247, 0.3);
+    animation: combo-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes combo-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.6), 0 10px 15px -3px rgba(168, 85, 247, 0.3); }
+    50% { box-shadow: 0 0 0 5px rgba(168, 85, 247, 0.8), 0 15px 20px -3px rgba(168, 85, 247, 0.5); }
+  }
+
   /* 卡牌背面 - 赌场风格 */
   .uno-card-back {
     background: linear-gradient(145deg, #1a1f2e 0%, #0f1419 100%);

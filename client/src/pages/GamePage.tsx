@@ -51,6 +51,9 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   const comboOptions = gameActions.comboOptions || [];
   const penaltyInfo = gameActions.penaltyInfo;
 
+  // 连打可选牌集合（紫色高亮）
+  const comboCards = new Set(comboOptions.flatMap((c: any) => c.cardIds || []));
+
   // 当前选中的牌是否构成了有效连打
   const activeCombo = comboOptions.find(c =>
     c.cardIds.length === selectedCards.length &&
@@ -183,13 +186,20 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
           cards={gameActions.myHand}
           isMyTurn={isMyTurn}
           selectedCards={selectedCards}
+          comboCards={comboCards}
           onCardClick={handleCardClick}
           canPlay={gameActions.canPlay}
         />
 
-        {/* 确认出牌按钮 */}
-        {selectedCards.length > 0 && isMyTurn && (
-          <div className="flex justify-center mt-3">
+        {/* 确认出牌按钮 — 只选1张或有有效连打时显示 */}
+        {selectedCards.length > 0 && isMyTurn && (selectedCards.length === 1 || activeCombo) && (
+          <div className="flex justify-center mt-3 gap-3">
+            <button
+              onClick={() => setSelectedCards([])}
+              className="px-4 py-3 text-cream-muted text-sm hover:text-cream transition-colors"
+            >
+              取消
+            </button>
             <button
               onClick={handleConfirmPlay}
               className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700
@@ -198,6 +208,21 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
             >
               {activeCombo ? `${activeCombo.label} 连打` : '出牌'}
             </button>
+          </div>
+        )}
+
+        {/* 选中多张但未形成有效连打 → 提示 */}
+        {selectedCards.length > 1 && !activeCombo && isMyTurn && (
+          <div className="flex justify-center mt-3 gap-3">
+            <button
+              onClick={() => setSelectedCards([])}
+              className="px-4 py-3 text-cream-muted text-sm hover:text-cream"
+            >
+              取消选择
+            </button>
+            <span className="px-4 py-3 text-amber-300 text-sm">
+              {selectedCards.length}张牌未形成有效连打
+            </span>
           </div>
         )}
 
@@ -462,12 +487,14 @@ function MyHand({
   cards,
   isMyTurn,
   selectedCards,
+  comboCards,
   onCardClick,
   canPlay
 }: {
   cards: CardType[];
   isMyTurn: boolean;
   selectedCards: string[];
+  comboCards: Set<string>;
   onCardClick: (cardId: string) => void;
   canPlay: (cardId: string) => boolean;
 }) {
@@ -477,21 +504,24 @@ function MyHand({
     <div className="flex justify-center items-end gap-0.5 sm:gap-1 py-3 sm:py-4 overflow-x-auto px-2">
       {cards.map((card, idx) => {
         const playable = isMyTurn && canPlay(card.id);
+        const isCombo = comboCards.has(card.id);
+        const isSelectable = playable || isCombo;
         const isSelected = selectedCards.includes(card.id);
 
         return (
           <div
             key={card.id}
             className="flex-shrink-0 -mx-1 sm:-mx-0.5 first:ml-0 last:mr-0"
-            style={{ zIndex: playable ? 10 + idx : idx }}
+            style={{ zIndex: isSelectable ? 10 + idx : idx }}
           >
             <Card
               card={card}
               size={cards.length > 10 ? 'sm' : 'md'}
-              isPlayable={playable}
+              isPlayable={playable && !isCombo}
+              isComboPart={isCombo && !playable}
               isSelected={isSelected}
-              disabled={!playable}
-              onClick={() => onCardClick(card.id)}
+              disabled={!isSelectable}
+              onClick={() => isSelectable && onCardClick(card.id)}
             />
           </div>
         );
