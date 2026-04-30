@@ -100,9 +100,8 @@ export class OutModeV2 extends BaseGameModeV2 {
     if (cards.length !== 3) return { valid: false, error: '三连需要3张牌' };
     if (cards.some(c => c.type === 'wild' || c.type === 'draw4'))
       return { valid: false, error: '万能牌不能参与连打' };
-    const color = cards[0].color;
-    if (!cards.every(c => c.color === color))
-      return { valid: false, error: '三连需要同色' };
+    if (cards[0].value !== cards[1].value || cards[1].value !== cards[2].value)
+      return { valid: false, error: '三连需要数字相同' };
     return { valid: true };
   }
 

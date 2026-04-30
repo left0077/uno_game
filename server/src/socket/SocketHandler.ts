@@ -904,17 +904,18 @@ function detectCombos(cards: Card[]): Array<{ type: string; cardIds: string[]; l
     }
   }
 
-  // 对子（同值2张）
+  // 对子/三条（同数字，颜色任意）
   for (const [, cards] of byValue) {
     if (cards.length >= 2) {
       results.push({ type: 'pair', cardIds: [cards[0].id, cards[1].id], label: `对子${cards[0].value}` });
-    }
-  }
-
-  // 三条（同色3张）
-  for (const [, cards] of byColor) {
-    if (cards.length >= 3) {
-      results.push({ type: 'three', cardIds: cards.slice(0, 3).map(c => c.id), label: '三条' + cards[0].color });
+      // 多张同数字时可提供不同组合
+      if (cards.length >= 3) {
+        results.push({ type: 'pair', cardIds: [cards[1].id, cards[2].id], label: `对子${cards[0].value}` });
+        results.push({ type: 'three', cardIds: cards.slice(0, 3).map(c => c.id), label: `三条${cards[0].value}` });
+      }
+      if (cards.length >= 4) {
+        results.push({ type: 'pair', cardIds: [cards[2].id, cards[3].id], label: `对子${cards[0].value}` });
+      }
     }
   }
 
