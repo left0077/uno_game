@@ -14,51 +14,22 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 // 事件类型定义
 export interface SocketEvents {
-  // 连接事件
   'connect': void;
   'disconnect': void;
   'connect_error': Error;
 
-  // 房间事件
   'room:created': Room;
   'room:joined': { success: boolean; room: Room; userId: string };
   'room:updated': Room;
-  'room:playerJoined': Player;
-  'room:playerLeft': { playerId: string };
 
-  // 游戏事件
   'game:started': { roomCode: string; mode: string; players: Player[] };
   'game:state': GameState;
   'game:ended': { winnerId?: string; rankings?: any[] };
-
-  // 合并推送：手牌 + 可用动作
-  'player:turn': { playerId: string; cards: any[]; cardCount: number; actions: any[] };
-
-  // 游戏内事件
-  'player:hand': { playerId: string; cards: any[]; cardCount: number };
-  'player:actions': { playerId: string; actions: any[] };
-  'game:turn': { playerId: string; deadline: number };
-  'game:error': { code: string; message: string };
-  'game:drawn': { card: any; playerId: string };
-  'game:played': any;
-  'game:unoCalled': { playerId: string };
-  'game:challengeResult': any;
-  'game:playerSkipped': { playerId: string; reason: string };
-  'game:penalty': any;
-  'game:hostage': any;
-
-  // V2 游戏事件
-  'v2:gameState': any;
-  'v2:playerHand': { playerId: string; cards: any[] };
-  'v2:availableActions': { playerId: string; actions: any[] };
-  'v2:actionFailed': { action: any; reason: string };
-
-  // 聊天事件
-  'chat:message': any;
-
   'game:event': { type: string; [key: string]: any };
 
-  // 错误事件
+  'player:turn': { playerId: string; cards: any[]; cardCount: number; actions: any[] };
+
+  'chat:message': any;
   'error': { code: string; message: string };
 }
 
