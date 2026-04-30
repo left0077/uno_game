@@ -846,10 +846,22 @@ function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): an
       }
 
       if (canPlay) {
+        // 计算可出原因
+        let reason = '';
+        if (hasPending) {
+          reason = card.type === 'reverse' ? '弹回反转' : '累加跟牌';
+        } else if (card.type === 'wild' || card.type === 'draw4' || card.type === 'draw8') {
+          reason = '万能牌';
+        } else if (card.color === game.state.currentColor) {
+          reason = '颜色匹配';
+        } else if (topCard && card.value === topCard.value) {
+          reason = '数字匹配';
+        }
         actions.push({
           type: actionType,
           cardId: card.id,
-          requiresColor: card.type === 'wild' || card.type === 'draw4'
+          requiresColor: card.type === 'wild' || card.type === 'draw4',
+          reason,
         });
       }
     }
@@ -961,18 +973,24 @@ function detectCombos(cards: Card[]): Array<{ type: string; cardIds: string[]; l
     }
   }
 
-  // 顺子（同色3+连续数字）
+  // 顺子（同色3+连续数字，去重）
   for (const [, cards] of byColor) {
     if (cards.length < 3) continue;
-    const nums = cards.map(c => ({ id: c.id, v: Number(c.value) })).filter(x => !isNaN(x.v)).sort((a, b) => a.v - b.v);
+    const nums = cards
+      .map(c => ({ id: c.id, v: Number(c.value) }))
+      .filter(x => !isNaN(x.v))
+      .sort((a, b) => a.v - b.v);
+    // 去重：同数字保留一张
+    const deduped = nums.filter((n, i) => i === 0 || n.v !== nums[i - 1].v);
+    if (deduped.length < 3) continue;
     let start = 0;
-    for (let i = 1; i <= nums.length; i++) {
-      if (i < nums.length && nums[i].v === nums[i - 1].v + 1) continue;
+    for (let i = 1; i <= deduped.length; i++) {
+      if (i < deduped.length && deduped[i].v === deduped[i - 1].v + 1) continue;
       if (i - start >= 3) {
         results.push({
           type: 'straight',
-          cardIds: nums.slice(start, i).map(x => x.id),
-          label: `顺子${nums[start].v}-${nums[i - 1].v}`,
+          cardIds: deduped.slice(start, i).map(x => x.id),
+          label: `顺子${deduped[start].v}-${deduped[i - 1].v}`,
         });
       }
       start = i;
