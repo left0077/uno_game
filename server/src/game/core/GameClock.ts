@@ -4,14 +4,14 @@
 
 import { Server } from 'socket.io';
 import { GameStateV2 } from './types.js';
-import { OutModeV2 } from './OutModeV2.js';
+import { BaseGameModeV2 } from './BaseGameModeV2.js';
 import { GAME_MODES } from '../../config/gameConfig.js';
 
 export interface GameClockCallbacks {
-  onPhaseAdvance: (phase: number) => void;
+  onPhaseAdvance?: (phase: number) => void;
   onAITurn: (playerId: string) => void;
   onTurnTimeout: (playerId: string) => void;
-  onGlobalTimeout: () => void;
+  onGlobalTimeout?: () => void;
   onTick: () => void;
 }
 
@@ -24,18 +24,20 @@ export class GameClock {
   private globalTimeout: number;
   private tickCount = 0;
   private lastScheduledAI: string | null = null;
+  private isOutMode: boolean;
 
   constructor(
     private state: GameStateV2,
-    private mode: OutModeV2,
+    private mode: BaseGameModeV2,
     private callbacks: GameClockCallbacks,
     private io: Server,
     private roomCode: string,
   ) {
     this.gameStartTime = state.gameStartTime;
-    this.phases = GAME_MODES.out.phases.map(p => p.at);
-    this.turnTimer = GAME_MODES.out.turnTimer;
-    this.globalTimeout = GAME_MODES.out.globalTimeout;
+    this.isOutMode = mode.name === 'out';
+    this.phases = this.isOutMode ? GAME_MODES.out.phases.map(p => p.at) : [];
+    this.turnTimer = GAME_MODES[mode.name as keyof typeof GAME_MODES]?.turnTimer || 120;
+    this.globalTimeout = this.isOutMode ? GAME_MODES.out.globalTimeout : 0;
   }
 
   start(): void {
@@ -63,10 +65,10 @@ export class GameClock {
       console.log(`[GameClock] tick ${this.tickCount}: elapsed=${Math.floor(elapsed)}s, turn=${currentPlayer?.nickname}, isAI=${currentPlayer?.isAI}, phase=${this.state.outState?.phase}`);
     }
 
-    this.checkPhaseAdvance(elapsed);
+    if (this.isOutMode) this.checkPhaseAdvance(elapsed);
 
-    if (elapsed >= this.globalTimeout) {
-      this.callbacks.onGlobalTimeout();
+    if (this.globalTimeout > 0 && elapsed >= this.globalTimeout) {
+      this.callbacks.onGlobalTimeout?.();
       return;
     }
 
@@ -77,7 +79,7 @@ export class GameClock {
     for (let i = this.lastPhase + 1; i < this.phases.length; i++) {
       if (elapsed >= this.phases[i]) {
         this.lastPhase = i;
-        this.callbacks.onPhaseAdvance(i);
+        this.callbacks.onPhaseAdvance?.(i);
       }
     }
   }

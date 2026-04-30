@@ -332,14 +332,14 @@ export function setupSocketHandlers(io: Server): void {
         v2Games.set(data.roomCode, gameInstance);
         room.status = 'playing';
 
-        // 启动游戏时钟（仅 Out 模式需要阶段推进和 AI 触发）
-        if (data.mode === 'out') {
+        // 启动游戏时钟（所有模式都需要 AI 触发）
+        {
           const clock = new GameClock(
             state,
-            mode as OutModeV2,
+            mode,
             {
               onPhaseAdvance: (phase) => {
-                (mode as OutModeV2).advancePhase(phase);
+                if (mode instanceof OutModeV2) mode.advancePhase(phase);
                 const phaseCfg = GAME_MODES.out.phases[phase];
                 if (phaseCfg) {
                   for (const [cardType, count] of Object.entries(phaseCfg.injectCards)) {
