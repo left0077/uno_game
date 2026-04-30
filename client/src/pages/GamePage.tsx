@@ -178,11 +178,12 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
       {/* ====== 主游戏区 ====== */}
       <div className="flex-1 flex flex-col items-center justify-center px-2 gap-3 max-w-lg mx-auto w-full">
 
-        {/* 牌堆 */}
+        {/* 牌堆 + 颜色 */}
         <div className="flex items-center justify-center gap-6 mt-2">
           <DiscardPile topCard={gameState.topCard} />
           <DrawPile onDraw={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} />
         </div>
+        <ColorDot color={gameState.currentColor} />
 
         {/* 上家出牌提示 */}
         {lastPlay?.cards?.length > 0 && (
@@ -667,6 +668,11 @@ function TurnTimer({ turnTimer, turnStartTime, isMyTurn }: { turnTimer?: number;
       {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
     </span>
   );
+}
+
+function ColorDot({ color }: { color: string }) {
+  const map: Record<string, string> = { red: 'bg-uno-red', yellow: 'bg-uno-yellow', green: 'bg-uno-green', blue: 'bg-uno-blue' };
+  return <div className="flex justify-center"><div className={`w-4 h-4 rounded-full ${map[color] || 'bg-slate-600'} border border-white/20 shadow-sm`} /></div>;
 }
 
 function StatusHint({ isMyTurn, pendingDraw, hasPlayable, error }: { isMyTurn: boolean; pendingDraw: number; hasPlayable: boolean; error?: string }) {
