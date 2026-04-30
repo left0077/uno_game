@@ -46,7 +46,7 @@ app.get('/', (_req: Request, res: Response) => {
   res.json({ 
     message: 'UNO Game Server is running!',
     health: '/health',
-    version: '1.0.0'
+    version: '2.1.0'
   });
 });
 
