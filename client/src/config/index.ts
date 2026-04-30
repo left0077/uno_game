@@ -37,7 +37,7 @@ export const PRIORITY_CONFIG = {
 
 // Socket配置
 export const SOCKET_CONFIG = {
-  url: import.meta.env.VITE_SOCKET_URL || 'https://uno-server-jbbr.onrender.com',
+  url: import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001',
   reconnectionAttempts: 5,
   reconnectionDelay: 1000,
 } as const;

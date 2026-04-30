@@ -10,7 +10,7 @@
 import { io, Socket } from 'socket.io-client';
 import type { Room, GameState, Player } from '../../../../shared/types';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://uno-server-jbbr.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 // 事件类型定义
 export interface SocketEvents {
