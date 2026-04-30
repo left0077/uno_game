@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-const URL = 'http://localhost:3000/uno/';
+const URL = 'http://localhost:3000/uno_game/';
 
 test.describe('边缘场景', () => {
   test('Out模式可开始', async ({ page }) => {

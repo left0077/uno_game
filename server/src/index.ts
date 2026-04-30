@@ -17,7 +17,7 @@ const io = new Server(httpServer, {
       'http://localhost:3000/uno',
       'http://127.0.0.1:3000',
       'https://left0077.github.io',
-      'https://left0077.github.io/uno'
+      'https://left0077.github.io/uno_game'
     ],
     methods: ['GET', 'POST'],
     credentials: true
@@ -32,7 +32,7 @@ const corsOptions = {
     'http://localhost:3000/uno',
     'http://127.0.0.1:3000',
     'https://left0077.github.io',
-    'https://left0077.github.io/uno'
+    'https://left0077.github.io/uno_game'
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

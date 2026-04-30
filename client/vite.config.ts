@@ -5,7 +5,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   // GitHub Pages 部署配置
-  base: '/uno/',
+  base: '/uno_game/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

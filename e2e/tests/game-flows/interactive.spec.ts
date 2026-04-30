@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-const URL = 'http://localhost:3000/uno/';
+const URL = 'http://localhost:3000/uno_game/';
 
 test('完整游玩流程', async ({ page }) => {
   test.setTimeout(90000);

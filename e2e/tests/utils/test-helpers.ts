@@ -68,7 +68,7 @@ export async function waitForPageLoad(page: Page): Promise<void> {
  * 设置服务器 URL (用于测试前准备)
  */
 export async function setupServerUrl(page: Page, url: string = 'http://localhost:3001'): Promise<void> {
-  await page.goto('/uno/');
+  await page.goto('/uno_game/');
   await page.evaluate((serverUrl) => {
     localStorage.setItem('uno-server-url', serverUrl);
   }, url);
@@ -122,7 +122,7 @@ export async function createRoom(
   options?: { waitForNavigation?: boolean }
 ): Promise<string> {
   // 访问首页
-  await page.goto('/uno/');
+  await page.goto('/uno_game/');
   await waitForPageLoad(page);
   
   // 等待连接就绪（创建房间按钮变为可用）
@@ -172,11 +172,11 @@ export async function joinRoom(
   roomCode: string
 ): Promise<void> {
   // 先清除 localStorage 避免状态干扰
-  await page.goto('/uno/');
+  await page.goto('/uno_game/');
   await page.evaluate(() => localStorage.clear());
 
   // 然后通过邀请链接进入
-  await page.goto(`/uno/?room=${roomCode}`);
+  await page.goto(`/uno_game/?room=${roomCode}`);
   await waitForPageLoad(page);
   
   // 等待连接就绪
@@ -250,7 +250,7 @@ export async function setupGame(
   const { aiCount = 1, aiDifficulty = 'easy' } = options;
   
   // 进入首页
-  await page.goto('/uno/');
+  await page.goto('/uno_game/');
   await waitForPageLoad(page);
   await waitForConnection(page);
   

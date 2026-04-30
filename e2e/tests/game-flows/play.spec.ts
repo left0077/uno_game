@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const URL = 'http://localhost:3000/uno/';
+const URL = 'http://localhost:3000/uno_game/';
 
 test.describe('E2E 渲染验证', () => {
   test('首页加载正常', async ({ page }) => {
@@ -25,4 +25,4 @@ test.describe('E2E 渲染验证', () => {
 });
 
 // 交互测试需要稳定的 socket 连接，暂时通过服务端单测覆盖游戏规则
-// 手动验证：打开 http://localhost:3000/uno/ 体验完整流程
+// 手动验证：打开 http://localhost:3000/uno_game/ 体验完整流程
