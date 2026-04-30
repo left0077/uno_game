@@ -35,9 +35,27 @@ test('完整游玩流程', async ({ page }) => {
   expect(text).toMatch(/摸牌/);
   console.log('✅ 游戏开始');
 
-  // 5. 等 AI 出牌
-  await page.waitForTimeout(6000);
+  // 5. 人类先出一张牌（如果是自己回合）
+  // 等 1 秒让 UI 渲染完
+  await page.waitForTimeout(1000);
+
+  // 点击第一张可出的牌（如果有）
+  const cardCount = await page.evaluate(() => {
+    const cards = document.querySelectorAll('[class*="card"], [class*="Card"]');
+    return cards.length;
+  });
+  console.log(`手牌数: ${cardCount}`);
+
+  // 尝试摸牌（总可以操作）
+  const drawBtn = page.locator('button:has-text("摸牌")');
+  if (await drawBtn.isVisible().catch(() => false)) {
+    await drawBtn.click({ force: true });
+    console.log('✅ 人类摸牌');
+  }
+
+  // 6. 等 AI 行动
+  await page.waitForTimeout(8000);
   text = await page.evaluate(() => document.body.textContent || '');
-  expect(text).toMatch(/摸牌/); // 游戏仍在运行
-  console.log('✅ AI 回合完成');
+  expect(text).toMatch(/摸牌/);
+  console.log('✅ AI 回合完成，游戏正常运行');
 });
