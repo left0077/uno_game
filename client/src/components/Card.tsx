@@ -125,8 +125,8 @@ export function Card({
         cursor-pointer
         select-none
         ${isSelected ? 'uno-card-selected' : ''}
-        ${isPlayable ? 'uno-card-playable uno-card-hover' : ''}
-        ${disabled ? 'uno-card-disabled' : 'uno-card-hover'}
+        ${isPlayable && !isSelected ? 'uno-card-playable' : ''}
+        ${disabled ? 'uno-card-disabled' : isSelected ? '' : 'uno-card-hover'}
       `}
       onClick={!disabled ? onClick : undefined}
       whileTap={!disabled ? { scale: 0.95 } : {}}

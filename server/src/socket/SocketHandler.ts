@@ -835,6 +835,7 @@ function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): an
     // 连打检测（仅 Out 模式，无惩罚时）
     if (game.mode.name === 'out' && !hasPending) {
       const combos = detectCombos(player.cards);
+      const alreadyPlayable = new Set(actions.map((a: any) => a.cardId));
       for (const combo of combos) {
         actions.push({
           type: 'combo',
@@ -842,6 +843,13 @@ function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): an
           cardIds: combo.cardIds,
           label: combo.label,
         });
+        // 连打中的每张牌也标记为可选（即使单独不能出）
+        for (const cid of combo.cardIds) {
+          if (!alreadyPlayable.has(cid)) {
+            actions.push({ type: 'play', cardId: cid, comboPart: true });
+            alreadyPlayable.add(cid);
+          }
+        }
       }
     }
 
