@@ -135,61 +135,61 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
     );
   }
 
+  const lastPlay = (gameState as any).lastPlay;
+  const canUno = gameActions.myHand.length <= 2;
+
   return (
-    <div className="min-h-screen p-2 sm:p-4 pb-24 sm:pb-4 relative z-10">
-      {/* 顶部信息栏 */}
-      <GameHeader
-        roomCode={room.code}
-        direction={typeof gameState.direction === 'string' ? (gameState.direction === 'clockwise' ? 1 : -1) : gameState.direction}
-        currentPlayer={currentPlayer}
-        isMyTurn={isMyTurn}
-        turnTimer={gameState.turnTimer}
-        turnStartTime={gameState.turnStartTime}
-        onLeaveRoom={onLeaveRoom}
-        phaseInfo={gameState.outState && gameState.gameStartTime ? {
-          gameStartTime: gameState.gameStartTime,
-          phaseTimes: (gameState as any).phaseTimes || [180, 360, 540],
-          currentPhase: gameState.outState.phase,
-          maxCards: gameState.outState.maxCards,
-        } : undefined}
-      />
+    <div className="min-h-screen bg-casino flex flex-col relative z-10">
+      {/* ====== 顶部栏 ====== */}
+      <div className="flex items-center justify-between px-3 py-2 casino-card mx-2 mt-2 gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-cream-muted text-xs">房间</span>
+          <span className="font-mono font-bold text-gold-light text-sm">{room.code}</span>
+          <span className="text-gold text-xs ml-1">{typeof gameState.direction === 'string' ? (gameState.direction === 'clockwise' ? '→' : '←') : gameState.direction === 1 ? '→' : '←'}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {gameState.outState && gameState.gameStartTime && (
+            <PhaseTimer
+              gameStartTime={gameState.gameStartTime}
+              phaseTimes={(gameState as any).phaseTimes || [180, 360, 540]}
+              currentPhase={gameState.outState.phase}
+              maxCards={gameState.outState.maxCards}
+            />
+          )}
+          <ConnectionStatus />
+        </div>
+        <div className="flex items-center gap-3">
+          <TurnTimer turnTimer={gameState.turnTimer} turnStartTime={gameState.turnStartTime} isMyTurn={isMyTurn} />
+          <button onClick={onLeaveRoom} className="btn-soft-red px-3 py-1 text-xs rounded-lg">离开</button>
+        </div>
+      </div>
 
-      {/* 游戏区域 - 柔和赌桌 */}
-      <div className="max-w-6xl mx-auto mt-6 table-area p-6">
-        {/* 其他玩家 */}
-        <OtherPlayers
-          players={gameState.players || room.players}
-          currentPlayerId={gameState.currentPlayerId}
-        />
+      {/* ====== 玩家头像行 ====== */}
+      <OtherPlayers players={gameState.players || room.players} currentPlayerId={gameState.currentPlayerId} />
 
-        {/* 最后出牌记录 */}
-        {gameState.lastPlay && (
-          <LastPlayDisplay
-            lastPlay={gameState.lastPlay}
-            players={gameState.players || room?.players || []}
-          />
-        )}
+      {/* ====== 主游戏区 ====== */}
+      <div className="flex-1 flex flex-col items-center justify-center px-2 gap-3 max-w-lg mx-auto w-full">
 
-        {/* 牌堆区域 */}
-        <div className="flex justify-center items-center gap-8 my-8">
-          {/* 弃牌堆 */}
+        {/* 牌堆 */}
+        <div className="flex items-center justify-center gap-6 mt-2">
           <DiscardPile topCard={gameState.topCard} />
-
-          {/* 抽牌堆 */}
           <DrawPile onDraw={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} />
         </div>
 
-        {/* 当前颜色指示 + 操作提示 */}
-        <div className="flex flex-col items-center gap-3 mb-6">
-          <ColorIndicator color={gameState.currentColor} />
-          <TurnHint
-            isMyTurn={isMyTurn}
-            hasPlayableCards={hasPlayableCards}
-            pendingDraw={pendingDraw}
-          />
-        </div>
+        {/* 上家出牌提示 */}
+        {lastPlay?.cards?.length > 0 && (
+          <div className="text-cream-muted/60 text-xs text-center animate-fade-in">
+            {(() => {
+              const p = (gameState.players || room?.players || []).find((x: any) => x.id === lastPlay.playerId);
+              return `${p?.nickname || '?'} 出了 ${lastPlay.type === 'combo' ? `${lastPlay.cardCount}张` : ''}`;
+            })()}
+          </div>
+        )}
 
-        {/* 我的手牌 */}
+        {/* 状态提示 */}
+        <StatusHint isMyTurn={isMyTurn} pendingDraw={pendingDraw} hasPlayable={hasPlayableCards} />
+
+        {/* 手牌 */}
         <MyHand
           cards={gameActions.myHand}
           isMyTurn={isMyTurn}
@@ -199,72 +199,49 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
           canPlay={gameActions.canPlay}
         />
 
-        {/* 确认出牌按钮 — 只选1张或有有效连打时显示 */}
+        {/* 选中操作 */}
         {selectedCards.length > 0 && isMyTurn && (selectedCards.length === 1 || activeCombo) && (
-          <div className="flex justify-center mt-3 gap-3">
-            <button
-              onClick={() => setSelectedCards([])}
-              className="px-4 py-3 text-cream-muted text-sm hover:text-cream transition-colors"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleConfirmPlay}
-              className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700
-                text-white font-bold text-lg rounded-xl shadow-lg shadow-emerald-600/30
-                hover:from-emerald-500 hover:to-emerald-600 transition-all active:scale-95"
-            >
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSelectedCards([])} className="text-cream-muted text-xs">取消</button>
+            <button onClick={handleConfirmPlay}
+              className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all">
               {activeCombo ? `${activeCombo.label} 连打` : '出牌'}
             </button>
           </div>
         )}
-
-        {/* 选中多张但未形成有效连打 → 提示 */}
         {selectedCards.length > 1 && !activeCombo && isMyTurn && (
-          <div className="flex justify-center mt-3 gap-3">
-            <button
-              onClick={() => setSelectedCards([])}
-              className="px-4 py-3 text-cream-muted text-sm hover:text-cream"
-            >
-              取消选择
-            </button>
-            <span className="px-4 py-3 text-amber-300 text-sm">
-              {selectedCards.length}张牌未形成有效连打
-            </span>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSelectedCards([])} className="text-cream-muted text-xs">取消</button>
+            <span className="text-amber-300 text-xs">{selectedCards.length}张未形成连打</span>
           </div>
         )}
 
-        {/* 表情栏 */}
-        <EmojiBar onSend={gameActions.sendEmoji} />
-
-        {/* 操作按钮 */}
-        <GameControls
-          isMyTurn={isMyTurn}
-          canDraw={gameActions.canDraw()}
-          canCallUno={gameActions.canCallUno()}
-          onDrawCard={handleDrawCard}
-          onCallUno={handleCallUno}
-        />
+        {/* 操作栏 */}
+        <div className="flex items-center justify-center gap-3 pb-2">
+          <EmojiBar onSend={gameActions.sendEmoji} />
+          <button onClick={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()}
+            className="px-5 py-2 btn-soft-blue text-sm rounded-xl disabled:opacity-40">
+            摸牌
+          </button>
+          <button onClick={handleCallUno} disabled={!canUno}
+            className={`px-5 py-2 text-sm rounded-xl font-bold transition-all ${
+              canUno ? 'btn-soft-red animate-pulse' : 'bg-felt-dark/60 text-cream-muted/40 cursor-not-allowed'
+            }`}>
+            UNO!
+          </button>
+        </div>
       </div>
 
-      {/* 颜色选择弹窗 */}
-      {showColorPicker && (
-        <ColorPickerModal onSelect={handleColorSelect} onCancel={() => setShowColorPicker(false)} />
-      )}
-
-      {/* 表情覆盖层 */}
-      <EmojiOverlay
-        messages={emojiMessages || []}
-        players={gameState?.players || room?.players || []}
-        onDismiss={onDismissEmoji || (() => {})}
-      />
+      {/* 弹窗 */}
+      {showColorPicker && <ColorPickerModal onSelect={handleColorSelect} onCancel={() => setShowColorPicker(false)} />}
+      <EmojiOverlay messages={emojiMessages || []} players={gameState?.players || room?.players || []} onDismiss={onDismissEmoji || (() => {})} />
     </div>
   );
 }
 
-// ========== 子组件 ==========
+// ========== 以下为旧子组件（已弃用，待清理） ==========
 
-function GameHeader({
+function _GameHeader({
   roomCode,
   direction,
   currentPlayer,
@@ -665,6 +642,30 @@ function LastPlayDisplay({ lastPlay, players }: { lastPlay: any; players: any[] 
       </div>
     </div>
   );
+}
+
+function TurnTimer({ turnTimer, turnStartTime, isMyTurn }: { turnTimer?: number; turnStartTime?: number; isMyTurn: boolean }) {
+  const [remaining, setRemaining] = useState(turnTimer || 120);
+  useEffect(() => {
+    if (!turnStartTime) return;
+    const dur = turnTimer || 120;
+    const tick = () => setRemaining(Math.max(0, dur - Math.floor((Date.now() - turnStartTime) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [turnTimer, turnStartTime]);
+  return (
+    <span className={`text-xs font-mono ${isMyTurn ? 'text-gold-light font-bold' : 'text-cream-muted'}`}>
+      {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
+    </span>
+  );
+}
+
+function StatusHint({ isMyTurn, pendingDraw, hasPlayable }: { isMyTurn: boolean; pendingDraw: number; hasPlayable: boolean }) {
+  if (!isMyTurn) return <div className="text-cream-muted/50 text-xs">等待其他玩家...</div>;
+  if (pendingDraw > 0) return <div className="text-red-300 text-xs font-bold animate-pulse">惩罚 +{pendingDraw} 张！跟牌或摸牌</div>;
+  if (!hasPlayable) return <div className="text-amber-300 text-xs">无牌可出 · 点击牌堆摸牌</div>;
+  return <div className="text-emerald-300 text-xs">你的回合 · 点击选牌</div>;
 }
 
 function ConnectionStatus() {
