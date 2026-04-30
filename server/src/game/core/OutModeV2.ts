@@ -37,7 +37,6 @@ export class OutModeV2 extends BaseGameModeV2 {
   protected validateCombo(action: GameActionV2): ValidationResult {
     const { playerId, cardIds, comboType } = action;
 
-    // 检查回合
     if (this.playerManager.getCurrentPlayerId() !== playerId) {
       return { valid: false, error: 'Not your turn' };
     }
@@ -47,6 +46,11 @@ export class OutModeV2 extends BaseGameModeV2 {
     }
     if (!comboType) {
       return { valid: false, error: '需要指定连打类型' };
+    }
+
+    // 有累积惩罚时不能连打（只能跟+或反转）
+    if (this.state.pendingDraw && this.state.pendingDraw > 0) {
+      return { valid: false, error: '惩罚中不能连打，请跟+或反转' };
     }
 
     const player = this.state.players.get(playerId);
@@ -60,6 +64,16 @@ export class OutModeV2 extends BaseGameModeV2 {
       const card = player.cards.find(c => c.id === cardId);
       if (!card) return { valid: false, error: `玩家没有牌 ${cardId}` };
       cards.push(card);
+    }
+
+    // 连打至少有一张牌可正常打出（匹配颜色或数字）
+    const topCard = this.state.discardPile[this.state.discardPile.length - 1];
+    const hasPlayable = cards.some(c =>
+      c.color === this.state.currentColor ||
+      (topCard && c.value === topCard.value)
+    );
+    if (!hasPlayable) {
+      return { valid: false, error: '连打中至少需要一张牌匹配当前颜色或数字' };
     }
 
     // 分派到具体验证

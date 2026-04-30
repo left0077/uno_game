@@ -12,6 +12,8 @@ import { EmojiOverlay } from '../components/EmojiOverlay';
 import type { Card as CardType } from '../../../shared/types';
 import { GAME_CONFIG } from '../config';
 
+interface EmojiMsg { playerId: string; emoji: any; target?: string; timestamp: number }
+
 interface GamePageProps {
   gameActions: {
     playCard: (cardId: string, chosenColor?: string) => boolean;
@@ -37,6 +39,7 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   const store = useGameStore();
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [pendingCardId, setPendingCardId] = useState<string | null>(null);
+  const [selectedCards, setSelectedCards] = useState<string[]>([]);
 
   const gameState = store.gameState;
   const room = store.room;
@@ -47,31 +50,56 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   const comboOptions = gameActions.comboOptions || [];
   const penaltyInfo = gameActions.penaltyInfo;
 
+  // 当前选中的牌是否构成了有效连打
+  const activeCombo = comboOptions.find(c =>
+    c.cardIds.length === selectedCards.length &&
+    c.cardIds.every((id: string) => selectedCards.includes(id))
+  );
+
   const handlePlayCombo = useCallback((cardIds: string[], comboType: string) => {
     gameActions.playCombo(cardIds, comboType as any);
+    setSelectedCards([]);
   }, [gameActions]);
 
-  // 处理出牌
-  const handlePlayCard = useCallback((cardId: string) => {
-    if (!gameActions.canPlay(cardId)) {
-      return;
-    }
+  // 点击牌：选中/取消
+  const handleCardClick = useCallback((cardId: string) => {
+    if (!isMyTurn) return;
+    if (!canPlay(cardId)) return;
 
-    // 检查是否需要选颜色
-    if (gameActions.requiresColorSelection(cardId)) {
-      setPendingCardId(cardId);
-      setShowColorPicker(true);
-      return;
-    }
+    setSelectedCards(prev => {
+      if (prev.includes(cardId)) return prev.filter(id => id !== cardId);
+      // 有惩罚时只能选一张
+      if (pendingDraw > 0) return [cardId];
+      return [...prev, cardId];
+    });
+  }, [isMyTurn, canPlay, pendingDraw]);
 
-    gameActions.playCard(cardId);
-  }, [gameActions]);
+  // 确认出牌
+  const handleConfirmPlay = useCallback(() => {
+    if (selectedCards.length === 0) return;
+
+    if (activeCombo) {
+      // 连打
+      handlePlayCombo(activeCombo.cardIds, activeCombo.comboType);
+    } else if (selectedCards.length === 1) {
+      // 单张出牌
+      const cardId = selectedCards[0];
+      if (gameActions.requiresColorSelection(cardId)) {
+        setPendingCardId(cardId);
+        setShowColorPicker(true);
+        return;
+      }
+      gameActions.playCard(cardId);
+      setSelectedCards([]);
+    }
+  }, [selectedCards, activeCombo, gameActions, handlePlayCombo]);
 
   // 处理颜色选择
   const handleColorSelect = useCallback((color: string) => {
     if (pendingCardId) {
       gameActions.playCard(pendingCardId, color);
       setPendingCardId(null);
+      setSelectedCards([]);
     }
     setShowColorPicker(false);
   }, [pendingCardId, gameActions]);
@@ -80,10 +108,11 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   const handleDrawCard = useCallback(() => {
     if (gameActions.canDraw()) {
       gameActions.drawCard();
+      setSelectedCards([]);
     }
   }, [gameActions]);
 
-  // 处理喊 UNO
+  // 处理喊 UNO（手牌 ≤ 2 时可喊）
   const handleCallUno = useCallback(() => {
     gameActions.callUno();
   }, [gameActions]);
@@ -152,24 +181,22 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
         <MyHand
           cards={gameActions.myHand}
           isMyTurn={isMyTurn}
-          onPlayCard={handlePlayCard}
+          selectedCards={selectedCards}
+          onCardClick={handleCardClick}
           canPlay={gameActions.canPlay}
         />
 
-        {/* 连打选项 */}
-        {comboOptions.length > 0 && isMyTurn && (
-          <div className="flex justify-center gap-2 flex-wrap mt-4">
-            {comboOptions.map((combo, i) => (
-              <button
-                key={i}
-                onClick={() => handlePlayCombo(combo.cardIds, combo.comboType)}
-                className="px-4 py-2 bg-purple-900/40 border border-purple-500/40 rounded-xl
-                  text-purple-200 text-sm font-medium hover:bg-purple-800/50
-                  hover:border-purple-400/60 transition-all"
-              >
-                {combo.label} ({combo.cardIds.length}张)
-              </button>
-            ))}
+        {/* 确认出牌按钮 */}
+        {selectedCards.length > 0 && isMyTurn && (
+          <div className="flex justify-center mt-3">
+            <button
+              onClick={handleConfirmPlay}
+              className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700
+                text-white font-bold text-lg rounded-xl shadow-lg shadow-emerald-600/30
+                hover:from-emerald-500 hover:to-emerald-600 transition-all active:scale-95"
+            >
+              {activeCombo ? `${activeCombo.label} 连打` : '出牌'}
+            </button>
           </div>
         )}
 
@@ -257,7 +284,7 @@ function GameHeader({
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-      {/* 第一行：房间号和方向 */}
+      {/* 第一行：房间号 + 方向 + 连接状态 */}
       <div className="flex items-center gap-2 sm:gap-4">
         <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 bg-felt-dark/60 border border-gold/20 rounded-lg sm:rounded-xl">
           <span className="text-cream-muted text-xs sm:text-sm">房间:</span>
@@ -267,6 +294,7 @@ function GameHeader({
           <span className="text-cream-muted text-xs sm:text-sm">方向:</span>
           <span className="text-gold font-bold text-sm sm:text-base">{direction === 1 ? '→' : '←'}</span>
         </div>
+        <ConnectionStatus />
       </div>
 
       {/* 中间：倒计时和当前回合 */}
@@ -308,36 +336,58 @@ function OtherPlayers({
   players,
   currentPlayerId
 }: {
-  players: { id: string; nickname: string; cardCount?: number; isAI?: boolean }[];
+  players: { id: string; nickname: string; cardCount?: number; isAI?: boolean; status?: string; eliminated?: boolean }[];
   currentPlayerId: string;
 }) {
   return (
     <div className="flex justify-center gap-1.5 sm:gap-3 flex-wrap px-1">
-      {players.map((player) => (
-        <div
-          key={player.id}
-          className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border transition-all ${
-            player.id === currentPlayerId
-              ? 'bg-gold/20 border-gold/50 shadow-lg shadow-gold/10 scale-105'
-              : 'bg-felt-dark/60 border-gold/10'
-          }`}
-        >
-          <div className="flex items-center gap-1">
-            {player.id === currentPlayerId && (
-              <span className="w-1.5 h-1.5 bg-gold rounded-full animate-pulse" />
+      {players.map((player, idx) => {
+        const isCurrent = player.id === currentPlayerId;
+        const isFinished = player.status === 'finished';
+        const isEliminated = player.eliminated;
+
+        return (
+          <div
+            key={player.id}
+            className={`relative px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border transition-all ${
+              isCurrent
+                ? 'bg-gold/20 border-gold/50 shadow-lg shadow-gold/10 scale-105'
+                : isFinished
+                ? 'bg-emerald-900/30 border-emerald-500/40'
+                : isEliminated
+                ? 'bg-red-900/20 border-red-500/30 opacity-60'
+                : 'bg-felt-dark/60 border-gold/10'
+            }`}
+          >
+            {/* 排名角标 */}
+            {isFinished && (
+              <span className="absolute -top-2 -right-2 text-lg">
+                {idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : ''}
+              </span>
             )}
-            <span className={`text-xs sm:text-sm font-medium truncate max-w-[50px] sm:max-w-[80px] ${
-              player.id === currentPlayerId ? 'text-gold-light' : 'text-cream'
-            }`}>
-              {player.nickname}
-            </span>
-            {player.isAI && (
-              <span className="text-[10px] text-blue-300/70" title="AI">AI</span>
+            {isEliminated && (
+              <span className="absolute -top-2 -right-2 text-xs bg-red-600 text-white px-1 rounded">OUT</span>
             )}
+
+            <div className="flex items-center gap-1">
+              {isCurrent && (
+                <span className="w-1.5 h-1.5 bg-gold rounded-full animate-pulse" />
+              )}
+              <span className={`text-xs sm:text-sm font-medium truncate max-w-[50px] sm:max-w-[80px] ${
+                isCurrent ? 'text-gold-light' : isFinished ? 'text-emerald-300' : 'text-cream'
+              }`}>
+                {player.nickname}
+              </span>
+              {player.isAI && (
+                <span className="text-[10px] text-blue-300/70">AI</span>
+              )}
+            </div>
+            <div className="text-cream-muted/60 text-[10px] sm:text-xs text-center mt-0.5">
+              {isFinished ? '🏆 完成!' : isEliminated ? '💀 淘汰' : `${player.cardCount ?? 0} 张`}
+            </div>
           </div>
-          <div className="text-cream-muted/60 text-[10px] sm:text-xs text-center mt-0.5">{player.cardCount ?? 0} 张</div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -406,12 +456,14 @@ function ColorIndicator({ color }: { color: string }) {
 function MyHand({
   cards,
   isMyTurn,
-  onPlayCard,
+  selectedCards,
+  onCardClick,
   canPlay
 }: {
   cards: CardType[];
   isMyTurn: boolean;
-  onPlayCard: (cardId: string) => void;
+  selectedCards: string[];
+  onCardClick: (cardId: string) => void;
   canPlay: (cardId: string) => boolean;
 }) {
   if (cards.length === 0) return null;
@@ -420,6 +472,7 @@ function MyHand({
     <div className="flex justify-center items-end gap-0.5 sm:gap-1 py-3 sm:py-4 overflow-x-auto px-2">
       {cards.map((card, idx) => {
         const playable = isMyTurn && canPlay(card.id);
+        const isSelected = selectedCards.includes(card.id);
 
         return (
           <div
@@ -431,8 +484,9 @@ function MyHand({
               card={card}
               size={cards.length > 10 ? 'sm' : 'md'}
               isPlayable={playable}
+              isSelected={isSelected}
               disabled={!playable}
-              onClick={() => onPlayCard(card.id)}
+              onClick={() => onCardClick(card.id)}
             />
           </div>
         );
@@ -521,6 +575,24 @@ function ColorPickerModal({
           取消
         </button>
       </div>
+    </div>
+  );
+}
+
+function ConnectionStatus() {
+  const [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const go = () => setOnline(navigator.onLine);
+    window.addEventListener('online', go);
+    window.addEventListener('offline', go);
+    return () => { window.removeEventListener('online', go); window.removeEventListener('offline', go); };
+  }, []);
+  return (
+    <div className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs ${
+      online ? 'bg-emerald-900/30 text-emerald-300' : 'bg-red-900/30 text-red-300 animate-pulse'
+    }`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-emerald-400' : 'bg-red-400'}`} />
+      {online ? '在线' : '离线'}
     </div>
   );
 }
