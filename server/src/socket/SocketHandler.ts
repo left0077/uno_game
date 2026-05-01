@@ -10,7 +10,7 @@
 import { Server, Socket } from 'socket.io';
 import { RoomManager, roomManager } from '../rooms/RoomManager.js';
 import { AIPlayer } from '../game/ai/index.js';
-import { SocketEvents, Player, Room, RoomSettings, Card } from '../shared/index.js';
+import { SocketEvents, Player, Room, RoomSettings } from '../shared/index.js';
 import { ACTION_API_VERSION } from '../shared/actionApi.js';
 import { GameStateV2, GameActionV2, calculateResult } from '../game/core/types.js';
 import { PlayerManager } from '../game/core/PlayerManager.js';
@@ -18,9 +18,6 @@ import { GameInitializer } from '../game/core/GameInitializer.js';
 import { BaseGameModeV2 } from '../game/core/BaseGameModeV2.js';
 import { OutModeV2 } from '../game/core/OutModeV2.js';
 import { StandardModeV2 } from '../game/core/StandardModeV2.js';
-import { GameClock } from '../game/core/GameClock.js';
-import { CardManager } from '../game/Card.js';
-import { GAME_MODES } from '../config/gameConfig.js';
 
 // V2 游戏实例
 interface V2GameInstance {
@@ -28,7 +25,6 @@ interface V2GameInstance {
   state: GameStateV2;
   mode: BaseGameModeV2;
   playerManager: PlayerManager;
-  clock?: GameClock;
 }
 
 // 存储 V2 游戏实例
@@ -85,9 +81,22 @@ export function setupSocketHandlers(io: Server): void {
     socket.on(SocketEvents.CREATE_ROOM, (data: { nickname: string; userId?: string }) => {
       try {
         const userId = data.userId || socketUserMap.get(socket.id) || socket.id;
+
+        // 离开之前的房间，防止同时存在于多个房间
+        const prevRoom = roomManager.getPlayerRoom(userId);
+        if (prevRoom) {
+          socket.leave(prevRoom.code);
+        }
+
         const room = roomManager.createRoom(userId, data.nickname);
         socket.join(room.code);
         socket.emit('room:created', room);
+
+        // 通知旧房间玩家已离开
+        if (prevRoom) {
+          io.to(prevRoom.code).emit(SocketEvents.ROOM_UPDATED, prevRoom);
+        }
+
         console.log(`[V2] Room created: ${room.code}`);
       } catch (error) {
         socket.emit(SocketEvents.ERROR, { code: 'CREATE_ROOM_FAILED', message: '创建房间失败' });
@@ -97,12 +106,24 @@ export function setupSocketHandlers(io: Server): void {
     socket.on(SocketEvents.JOIN_ROOM, (data: { roomCode: string; nickname: string; userId?: string }) => {
       try {
         const userId = data.userId || socketUserMap.get(socket.id) || socket.id;
+
+        // 离开之前的房间，防止同时存在于多个房间
+        const prevRoom = roomManager.getPlayerRoom(userId);
+        if (prevRoom) {
+          socket.leave(prevRoom.code);
+        }
+
         const room = roomManager.joinRoom(data.roomCode, userId, data.nickname);
         if (!room) {
           socket.emit(SocketEvents.ERROR, { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
           return;
         }
-        
+
+        // 通知旧房间玩家已离开
+        if (prevRoom) {
+          io.to(prevRoom.code).emit(SocketEvents.ROOM_UPDATED, prevRoom);
+        }
+
         socket.join(data.roomCode);
         io.to(data.roomCode).emit('room:updated', room);
         socket.emit('room:joined', { success: true, room, userId });
@@ -332,113 +353,8 @@ export function setupSocketHandlers(io: Server): void {
         v2Games.set(data.roomCode, gameInstance);
         room.status = 'playing';
 
-        // 启动游戏时钟（所有模式都需要 AI 触发）
-        {
-          const clock = new GameClock(
-            state,
-            mode,
-            {
-              onPhaseAdvance: (phase) => {
-                if (mode instanceof OutModeV2) mode.advancePhase(phase);
-                const phaseCfg = GAME_MODES.out.phases[phase];
-                if (phaseCfg) {
-                  for (const [cardType, count] of Object.entries(phaseCfg.injectCards)) {
-                    state.deck = CardManager.injectPenaltyCards(
-                      state.deck,
-                      cardType as 'draw3' | 'draw5' | 'draw8',
-                      count
-                    );
-                  }
-                }
-                broadcastGameStateV2(io, data.roomCode, gameInstance);
-              },
-              onAITurn: (playerId) => {
-                const player = state.players.get(playerId);
-                if (!player || !player.isAI) return;
-
-                console.log(`[AI] ${player.nickname} 回合开始，手牌${player.cards.length}张`);
-
-                const aiAction = AIPlayer.getAIAction(
-                  player,
-                  state as any,
-                  [...state.players.values()]
-                );
-
-                const delay = AIPlayer.getDecisionDelay(player.aiDifficulty || 'normal');
-
-                setTimeout(() => {
-                  let action: GameActionV2;
-
-                  if (aiAction) {
-                    action = {
-                      type: aiAction.type as any,
-                      playerId,
-                      cardIds: aiAction.cardIds,
-                      chosenColor: (aiAction as any).chosenColor,
-                      comboType: (aiAction as any).comboType,
-                      targetId: aiAction.targetId,
-                      timestamp: Date.now()
-                    };
-                  } else {
-                    // 无可用动作，强制摸牌 + 推进（不验证，避免竞态）
-                    const p = state.players.get(playerId);
-                    if (p) {
-                      const cards = state.deck.splice(-1, 1);
-                      if (cards.length) { p.cards.push(cards[0]); p.cardCount = p.cards.length; }
-                    }
-                    state.pendingDraw = 0;
-                    state.jumpInWindow = false;
-                    game.playerManager.nextTurn();
-                    broadcastGameStateV2(io, data.roomCode, gameInstance);
-                    return; // 跳过后续 handleAction
-                  }
-
-                  console.log(`[AI] ${player.nickname} 执行: ${action.type}` +
-                    (action.cardIds ? ` ${action.cardIds.length}张` : ''));
-
-                  const result = mode.handleAction(action);
-
-                  if (result.success) {
-                    broadcastGameStateV2(io, data.roomCode, gameInstance);
-                    if (state.phase === 'finished') {
-                      handleGameEndV2(io, data.roomCode, gameInstance);
-                    }
-                  } else {
-                    // AI 动作被拒绝，强制摸牌兜底
-                    console.log(`[AI] ${player.nickname} 动作被拒: ${result.error?.message}`);
-                    // 直接操作状态规避验证失败（竞态：回合可能在延迟期间变了）
-                    const p = state.players.get(playerId);
-                    if (p) {
-                      const cards = state.deck.splice(-1, 1);
-                      if (cards.length) { p.cards.push(cards[0]); p.cardCount = p.cards.length; }
-                    }
-                    state.pendingDraw = 0;
-                    state.pendingDrawType = undefined;
-                    state.jumpInWindow = false;
-                    game.playerManager.nextTurn();
-                    broadcastGameStateV2(io, data.roomCode, gameInstance);
-                  }
-                }, delay);
-              },
-              onTurnTimeout: (playerId) => {
-                console.log(`[V2] Turn timeout: ${playerId}`);
-                mode.handleAction({ type: 'draw', playerId, timestamp: Date.now() });
-                broadcastGameStateV2(io, data.roomCode, gameInstance);
-              },
-              onGlobalTimeout: () => {
-                console.log(`[V2] Global timeout in room: ${data.roomCode}`);
-                state.phase = 'finished';
-                state.winnerId = undefined; // 平局
-                handleGameEndV2(io, data.roomCode, gameInstance);
-              },
-              onTick: () => {},
-            },
-            io,
-            data.roomCode
-          );
-          clock.start();
-          gameInstance.clock = clock;
-        }
+        // 启动游戏循环（所有游戏逻辑由 Mode 内部管理）
+        mode.start(() => broadcastGameStateV2(io, data.roomCode, gameInstance));
 
         // 发送游戏开始事件（通知客户端跳转）
         io.to(data.roomCode).emit('game:started', {
@@ -486,10 +402,7 @@ export function setupSocketHandlers(io: Server): void {
       const result = game.mode.handleAction(action);
 
       if (result.success) {
-        broadcastGameStateV2(io, data.roomCode, game);
-        if (game.state.phase === 'finished') {
-          handleGameEndV2(io, data.roomCode, game);
-        }
+        broadcastAfterAction(io, data.roomCode, game);
       } else {
         socket.emit(SocketEvents.ERROR, {
           action: data.action,
@@ -534,10 +447,7 @@ export function setupSocketHandlers(io: Server): void {
       const success = game.mode.handleAction(action);
       
       if (success) {
-        broadcastGameStateV2(io, data.roomCode, game);
-        if (game.state.phase === 'finished') {
-          handleGameEndV2(io, data.roomCode, game);
-        }
+        broadcastAfterAction(io, data.roomCode, game);
       } else {
         socket.emit(SocketEvents.ERROR, { 
           action,
@@ -572,10 +482,7 @@ export function setupSocketHandlers(io: Server): void {
       const success = game.mode.handleAction(action);
       
       if (success) {
-        broadcastGameStateV2(io, data.roomCode, game);
-        if (game.state.phase === 'finished') {
-          handleGameEndV2(io, data.roomCode, game);
-        }
+        broadcastAfterAction(io, data.roomCode, game);
       } else {
         socket.emit(SocketEvents.ERROR, { 
           action,
@@ -602,10 +509,7 @@ export function setupSocketHandlers(io: Server): void {
       const success = game.mode.handleAction(action);
       
       if (success) {
-        broadcastGameStateV2(io, data.roomCode, game);
-        if (game.state.phase === 'finished') {
-          handleGameEndV2(io, data.roomCode, game);
-        }
+        broadcastAfterAction(io, data.roomCode, game);
       } else {
         socket.emit(SocketEvents.ERROR, { 
           action,
@@ -632,7 +536,7 @@ export function setupSocketHandlers(io: Server): void {
       const success = game.mode.handleAction(action);
       
       if (success) {
-        broadcastGameStateV2(io, data.roomCode, game);
+        broadcastAfterAction(io, data.roomCode, game);
         io.to(data.roomCode).emit('game:event', { type: 'uno_called', playerId: action.playerId });
       } else {
         socket.emit(SocketEvents.ERROR, { action, reason: 'INVALID_ACTION' });
@@ -658,7 +562,7 @@ export function setupSocketHandlers(io: Server): void {
       const success = game.mode.handleAction(action);
       
       if (success) {
-        broadcastGameStateV2(io, data.roomCode, game);
+        broadcastAfterAction(io, data.roomCode, game);
         const challengedPlayer = game.state.players.get(action.targetId || '');
         io.to(data.roomCode).emit('game:event', {
           type: 'challenge_success',
@@ -676,7 +580,7 @@ export function setupSocketHandlers(io: Server): void {
     socket.on('v2:getState', (data: { roomCode: string }) => {
       const game = v2Games.get(data.roomCode);
       if (game) {
-        socket.emit('game:state', serializeGameStateV2(game));
+        socket.emit('game:state', game.mode.serializePublicState());
       }
     });
 
@@ -686,7 +590,7 @@ export function setupSocketHandlers(io: Server): void {
       
       if (!game) return;
       
-      const actions = calculateAvailableActionsV2(game, userId);
+      const actions = game.mode.getAvailableActions(userId);
       socket.emit('player:actions', { playerId: userId, actions });
     });
 
@@ -722,7 +626,7 @@ export function setupSocketHandlers(io: Server): void {
  * 广播游戏状态给房间所有玩家
  */
 function broadcastGameStateV2(io: Server, roomCode: string, game: V2GameInstance): void {
-  const state = serializeGameStateV2(game);
+  const state = game.mode.serializePublicState();
   io.to(roomCode).emit('game:state', state);
 
   // 为已完成的玩家发送空手牌
@@ -757,7 +661,7 @@ function broadcastGameStateV2(io: Server, roomCode: string, game: V2GameInstance
           playerId,
           cards: player.cards,
           cardCount: player.cards.length,
-          actions: calculateAvailableActionsV2(game, playerId),
+          actions: game.mode.getAvailableActions(playerId),
         });
         break;
       }
@@ -765,298 +669,27 @@ function broadcastGameStateV2(io: Server, roomCode: string, game: V2GameInstance
   }
 }
 
-/**
- * 序列化 V2 游戏状态为前端格式
- */
-function serializeGameStateV2(game: V2GameInstance): any {
-  const state = game.state;
-  const pm = game.playerManager;
-  
-  return {
-    version: 'v2',
-    phase: state.phase,
-    currentPlayerId: pm.getCurrentPlayerId(),
-    currentPlayerIndex: state.currentPlayerIndex,
-    direction: state.direction,
-    
-    // 牌堆
-    deckCount: state.deck.length,
-    discardPile: state.discardPile,
-    topCard: state.discardPile[state.discardPile.length - 1] || null,
-    currentColor: state.currentColor,
-    
-    // 惩罚状态
-    pendingDraw: state.pendingDraw || 0,
-    pendingDrawType: state.pendingDrawType,
-    penaltySourceId: state.penaltySourceId,
-    skippedPlayerId: state.skippedPlayerId,
-    
-    // 玩家列表（不包含手牌，手牌单独发送）
-    players: pm.getAllPlayersInOrder().map(p => ({
-      id: p.id,
-      nickname: p.nickname,
-      cardCount: p.cards.length,
-      status: pm.isOnTable(p.id) ? 'ontable' : 'finished',
-      eliminated: p.eliminated,
-      hasCalledUno: p.hasCalledUno,
-      isAI: p.isAI
-    })),
-    
-    // 排名（游戏结束时）
-    rankings: state.phase === 'finished' 
-      ? calculateResult(state).rankings
-      : null,
-    
-    // 惩罚统计
-    penaltyStats: state.penaltyStats || {},
-
-    // Out模式特有
-    outState: state.outState,
-
-    // 阶段计时
-    gameStartTime: state.gameStartTime,
-    phaseTimes: GAME_MODES.out.phases.map(p => p.at),
-
-    // Jump In 窗口
-    jumpInWindow: state.jumpInWindow || false,
-    jumpInDeadline: state.jumpInDeadline || 0,
-
-    // 最后出牌记录
-    lastPlay: state.lastAction ? {
-      playerId: state.lastAction.playerId,
-      type: state.lastAction.type,
-      cardCount: (state.lastAction.cardIds || []).length,
-      cards: (state.lastAction.cardIds || []).map(cid => {
-        for (const p of state.players.values()) {
-          const found = p.cards.find(c => c.id === cid);
-          if (found) return found;
-        }
-        // 可能已从手牌移除（出掉了），从弃牌堆找
-        for (let i = state.discardPile.length - 1; i >= 0; i--) {
-          if (state.discardPile[i].id === cid) return state.discardPile[i];
-        }
-        return null;
-      }).filter(Boolean),
-    } : null,
-
-    // 元数据
-    turnStartTime: state.turnStartTime,
-    lastAction: state.lastAction
-  };
+function broadcastAfterAction(io: Server, roomCode: string, game: V2GameInstance): void {
+  broadcastGameStateV2(io, roomCode, game);
+  if (game.mode.isFinished()) {
+    handleGameEndV2(io, roomCode, game);
+  }
 }
 
-/**
- * 计算玩家可用动作
- */
-function calculateAvailableActionsV2(game: V2GameInstance, playerId: string): any[] {
-  const actions: any[] = [];
-  const player = game.state.players.get(playerId);
-  
-  if (!player || !game.playerManager.isOnTable(playerId)) {
-    return actions;
-  }
-  
-  const isCurrentTurn = game.playerManager.getCurrentPlayerId() === playerId;
-  
-  if (isCurrentTurn) {
-    const topCard = game.state.discardPile[game.state.discardPile.length - 1];
-    const hasPending = game.state.pendingDraw && game.state.pendingDraw > 0;
-
-    for (const card of player.cards) {
-      let canPlay = false;
-      let actionType = 'play';
-
-      if (hasPending) {
-        // 有累积惩罚时：可跟+（任意类型）、可出反转弹回
-        canPlay = card.type === 'draw2' || card.type === 'draw3' ||
-                  card.type === 'draw4' || card.type === 'draw5' ||
-                  card.type === 'draw8' || card.type === 'reverse';
-        if (canPlay && card.type === 'reverse') {
-          actionType = 'reverse';
-        }
-      } else {
-        if (card.type === 'wild' || card.type === 'draw4') canPlay = true;
-        else if (card.color === game.state.currentColor) canPlay = true;
-        else if (topCard && card.value === topCard.value) canPlay = true;
-      }
-
-      if (canPlay) {
-        // 计算可出原因
-        let reason = '';
-        if (hasPending) {
-          reason = card.type === 'reverse' ? '弹回反转' : '累加跟牌';
-        } else if (card.type === 'wild' || card.type === 'draw4' || card.type === 'draw8') {
-          reason = '万能牌';
-        } else if (card.color === game.state.currentColor) {
-          reason = '颜色匹配';
-        } else if (topCard && card.value === topCard.value) {
-          reason = '数字匹配';
-        }
-        actions.push({
-          type: actionType,
-          cardId: card.id,
-          requiresColor: card.type === 'wild' || card.type === 'draw4',
-          reason,
-        });
-      }
-    }
-
-    // 连打检测（仅 Out 模式，无惩罚时）
-    if (game.mode.name === 'out' && !hasPending) {
-      const combos = detectCombos(player.cards);
-      const alreadyPlayable = new Set(actions.map((a: any) => a.cardId));
-      for (const combo of combos) {
-        actions.push({
-          type: 'combo',
-          comboType: combo.type,
-          cardIds: combo.cardIds,
-          label: combo.label,
-        });
-        // 不单独发送连打牌为 play action——客户端从 combo 数组中自行计算候选牌
-      }
-    }
-
-    // 惩罚信息
-    if (hasPending) {
-      actions.push({
-        type: 'penalty_info',
-        pendingDraw: game.state.pendingDraw,
-        penaltySourceId: game.state.penaltySourceId
-      });
-    }
-
-    actions.push({ type: 'draw' });
-  }
-
-  // UNO 可随时喊（不限于自己的回合）
-  if (player.cards.length <= 2) {
-    actions.push({ type: 'uno' });
-  }
-
-  // Challenge 可随时质疑（任何人手牌=1且未喊UNO）
-  for (const [pid, p] of game.state.players) {
-    if (pid !== playerId && p.cards.length === 1 && !p.hasCalledUno) {
-      actions.push({ type: 'challenge', targetId: pid });
-    }
-  }
-
-  // 非当前回合：检测 Jump In（完全相同牌可抢出）
-  if (!isCurrentTurn && game.state.discardPile.length > 0) {
-    const topCard = game.state.discardPile[game.state.discardPile.length - 1];
-    for (const card of player.cards) {
-      if (card.color === topCard.color && card.value === topCard.value) {
-        actions.push({ type: 'jumpIn', cardId: card.id });
-      }
-    }
-  }
-
-  return actions;
-}
-
-/**
- * 连打检测（服务端权威）
- * 使用与 OutModeV2 相同的验证规则
- */
-function detectCombos(cards: Card[]): Array<{ type: string; cardIds: string[]; label: string }> {
-  const results: Array<{ type: string; cardIds: string[]; label: string }> = [];
-  const normal = cards.filter(c => c.type !== 'wild' && c.type !== 'draw4' && c.type !== 'draw8');
-  if (normal.length < 2) return results;
-
-  // 按颜色和数值分组
-  const byColor = new Map<string, Card[]>();
-  const byValue = new Map<number, Card[]>();
-  for (const c of normal) {
-    if (!byColor.has(c.color)) byColor.set(c.color, []);
-    byColor.get(c.color)!.push(c);
-    const v = Number(c.value);
-    if (!isNaN(v)) {
-      if (!byValue.has(v)) byValue.set(v, []);
-      byValue.get(v)!.push(c);
-    }
-  }
-
-  // 对子/三条/炸弹/核弹（同数字，颜色任意）
-  for (const [, cards] of byValue) {
-    if (cards.length >= 2) {
-      results.push({ type: 'pair', cardIds: [cards[0].id, cards[1].id], label: `对子${cards[0].value}` });
-      if (cards.length >= 3) {
-        results.push({ type: 'pair', cardIds: [cards[1].id, cards[2].id], label: `对子${cards[0].value}` });
-        results.push({ type: 'three', cardIds: cards.slice(0, 3).map(c => c.id), label: `三条${cards[0].value}` });
-      }
-      if (cards.length >= 4) {
-        results.push({ type: 'pair', cardIds: [cards[2].id, cards[3].id], label: `对子${cards[0].value}` });
-        results.push({ type: 'three', cardIds: cards.slice(0, 4).map(c => c.id), label: `💣炸弹${cards[0].value}` });
-      }
-      if (cards.length >= 5) {
-        results.push({ type: 'three', cardIds: cards.slice(0, 5).map(c => c.id), label: `☢️核弹${cards[0].value}` });
-      }
-    }
-  }
-
-  // 彩虹（四色同值）
-  for (const [, cards] of byValue) {
-    if (cards.length >= 4) {
-      const colors = new Set(cards.map(c => c.color));
-      if (colors.size >= 4) {
-        const picked: Card[] = [];
-        const used = new Set<string>();
-        for (const c of cards) {
-          if (!used.has(c.color)) { picked.push(c); used.add(c.color); }
-        }
-        if (picked.length >= 4) {
-          results.push({ type: 'rainbow', cardIds: picked.slice(0, 4).map(c => c.id), label: `彩虹${picked[0].value}` });
-        }
-      }
-    }
-  }
-
-  // 顺子（同色3+连续数字，去重）
-  for (const [, cards] of byColor) {
-    if (cards.length < 3) continue;
-    const nums = cards
-      .map(c => ({ id: c.id, v: Number(c.value) }))
-      .filter(x => !isNaN(x.v))
-      .sort((a, b) => a.v - b.v);
-    // 去重：同数字保留一张
-    const deduped = nums.filter((n, i) => i === 0 || n.v !== nums[i - 1].v);
-    if (deduped.length < 3) continue;
-    let start = 0;
-    for (let i = 1; i <= deduped.length; i++) {
-      if (i < deduped.length && deduped[i].v === deduped[i - 1].v + 1) continue;
-      if (i - start >= 3) {
-        results.push({
-          type: 'straight',
-          cardIds: deduped.slice(start, i).map(x => x.id),
-          label: `顺子${deduped[start].v}-${deduped[i - 1].v}`,
-        });
-      }
-      start = i;
-    }
-  }
-
-  return results;
-}
-
-/**
- * 处理游戏结束
- */
 function handleGameEndV2(io: Server, roomCode: string, game: V2GameInstance): void {
   const result = calculateResult(game.state);
   const room = roomManager.getRoom(roomCode);
-  
+
   if (room) {
     room.status = 'waiting';
     room.gameState = undefined;
   }
-  
+
   io.to(roomCode).emit('game:ended', {
     winnerId: result.winnerId,
     rankings: result.rankings
   });
 
-  // 停止时钟
-  game.clock?.stop();
   v2Games.delete(roomCode);
-
   console.log(`[V2] Game ended in room: ${roomCode}`);
 }

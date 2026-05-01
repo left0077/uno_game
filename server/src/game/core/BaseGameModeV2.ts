@@ -13,9 +13,12 @@ import {
   GameActionV2,
   ValidationResult,
   ActionResult,
-  GameConfig
+  GameConfig,
+  calculateResult,
 } from './types.js';
 import { PlayerManager } from './PlayerManager.js';
+import { GameClock } from './GameClock.js';
+import { AIPlayer } from '../ai/AIPlayer.js';
 
 export abstract class BaseGameModeV2 {
   readonly abstract name: string;
@@ -48,7 +51,8 @@ export abstract class BaseGameModeV2 {
   initialize(state: GameStateV2): void {
     this.state = state;
     this.playerManager = new PlayerManager(state);
-    
+    this.state.playerLastActions = new Map();
+
     // 子类扩展
     this.onInitialize();
   }
@@ -80,6 +84,7 @@ export abstract class BaseGameModeV2 {
     try {
       this.executeAction(action);
       this.state.lastAction = { ...action, timestamp: Date.now() };
+      this.recordPlayerActionSummary(action);
       return { success: true };
     } catch (error) {
       console.error('[BaseGameModeV2] 执行动作失败:', error);
@@ -196,17 +201,14 @@ export abstract class BaseGameModeV2 {
     if (!player) {
       return { valid: false, error: 'Player not found' };
     }
-    
-    // 只能在自己的回合喊UNO
-    if (this.playerManager.getCurrentPlayerId() !== action.playerId) {
-      return { valid: false, error: 'Not your turn' };
-    }
-    
+
+    // UNO 可随时喊，不限于自己的回合
+
     // 手牌必须 <= 2
     if (player.cards.length > 2) {
       return { valid: false, error: 'Can only call UNO when you have 1 or 2 cards' };
     }
-    
+
     return { valid: true };
   }
   
@@ -303,7 +305,7 @@ export abstract class BaseGameModeV2 {
     this.state.discardPile.push(card);
     
     // 设置颜色
-    if (card.type === 'wild' || card.type === 'draw4') {
+    if (card.type === 'wild' || card.type === 'draw4' || card.type === 'draw8') {
       this.state.currentColor = chosenColor || 'red';
     } else {
       this.state.currentColor = card.color;
@@ -364,7 +366,7 @@ export abstract class BaseGameModeV2 {
   /**
    * 执行跳过
    */
-  protected executeSkip(action: GameActionV2): void {
+  protected executeSkip(_action: GameActionV2): void {
     this.playerManager.nextTurn();
   }
   
@@ -492,8 +494,8 @@ export abstract class BaseGameModeV2 {
       return this.canStackCard(card);
     }
     
-    // 万能牌可以出
-    if (card.type === 'wild' || card.type === 'draw4') return true;
+    // 万能牌可以出（wild / +4 / +8）
+    if (card.type === 'wild' || card.type === 'draw4' || card.type === 'draw8') return true;
     
     // 颜色匹配
     if (card.color === this.state.currentColor) return true;
@@ -538,7 +540,7 @@ export abstract class BaseGameModeV2 {
     }
   }
   
-  protected applySkipEffect(playerId: string): void {
+  protected applySkipEffect(_playerId: string): void {
     const nextId = this.playerManager.getNextPlayerId();
     if (nextId) {
       this.state.skippedPlayerId = nextId;
@@ -614,13 +616,437 @@ export abstract class BaseGameModeV2 {
   }
   
   // ============================================================================
+  // 可用动作计算（供 SocketHandler 调用）
+  // ============================================================================
+
+  /**
+   * 计算玩家当前可用动作
+   * canPlayCard 是卡牌可出性的唯一真相源
+   */
+  getAvailableActions(playerId: string): any[] {
+    const actions: any[] = [];
+    const player = this.state.players.get(playerId);
+
+    if (!player || !this.playerManager.isOnTable(playerId)) return actions;
+
+    const isCurrentTurn = this.playerManager.getCurrentPlayerId() === playerId;
+
+    if (isCurrentTurn) {
+      const topCard = this.state.discardPile[this.state.discardPile.length - 1];
+      const hasPending = (this.state.pendingDraw || 0) > 0;
+
+      // 单张出牌：统一调用 canPlayCard
+      for (const card of player.cards) {
+        if (this.canPlayCard(card)) {
+          let reason = '';
+          if (hasPending) {
+            reason = '累加跟牌';
+          } else if (card.type === 'wild' || card.type === 'draw4' || card.type === 'draw8') {
+            reason = '万能牌';
+          } else if (card.color === this.state.currentColor) {
+            reason = '颜色匹配';
+          } else if (topCard && card.value === topCard.value) {
+            reason = '数字匹配';
+          }
+          actions.push({
+            type: 'play',
+            cardId: card.id,
+            requiresColor: card.type === 'wild' || card.type === 'draw4' || card.type === 'draw8',
+            reason,
+          });
+        }
+
+        // 惩罚时可出反转弹回（独立于 canPlayCard，走 validateReverse 路径）
+        if (hasPending && card.type === 'reverse' && this.state.penaltySourceId) {
+          actions.push({
+            type: 'reverse',
+            cardId: card.id,
+            requiresColor: false,
+            reason: '弹回反转',
+          });
+        }
+      }
+
+      // 子类扩展（如连打检测）
+      this.getModeSpecificActions(player, isCurrentTurn, hasPending, actions);
+
+      // 惩罚信息
+      if (hasPending) {
+        actions.push({
+          type: 'penalty_info',
+          pendingDraw: this.state.pendingDraw,
+          penaltySourceId: (this.state as any).penaltySourceId,
+        });
+      }
+
+      actions.push({ type: 'draw' });
+    }
+
+    // UNO 可随时喊（不限于自己的回合）
+    if (player.cards.length <= 2) {
+      actions.push({ type: 'uno' });
+    }
+
+    // Challenge 可随时质疑（任何人手牌=1且未喊UNO）
+    for (const [pid, p] of this.state.players) {
+      if (pid !== playerId && p.cards.length === 1 && !p.hasCalledUno) {
+        actions.push({ type: 'challenge', targetId: pid });
+      }
+    }
+
+    // 非当前回合：检测 Jump In（完全相同牌可抢出）
+    if (!isCurrentTurn && this.state.discardPile.length > 0) {
+      const topCard = this.state.discardPile[this.state.discardPile.length - 1];
+      for (const card of player.cards) {
+        if (card.color === topCard.color && card.value === topCard.value) {
+          actions.push({ type: 'jumpIn', cardId: card.id });
+        }
+      }
+    }
+
+    return actions;
+  }
+
+  protected getModeSpecificActions(
+    _player: Player,
+    _isCurrentTurn: boolean,
+    _hasPending: boolean,
+    _actions: any[]
+  ): void {
+    // 子类覆盖
+  }
+
+  // ============================================================================
+  // 生命周期（SocketHandler 通过这两个回调接入）
+  // ============================================================================
+
+  private onStateChange?: () => void;
+  protected clock?: GameClock;
+  private lastScheduledAI: string | null = null;
+
+  /**
+   * 启动游戏循环
+   */
+  start(onStateChange: () => void): void {
+    this.onStateChange = onStateChange;
+    this.clock = new GameClock(() => this.onTick());
+    this.clock.start();
+  }
+
+  isFinished(): boolean {
+    return this.state.phase === 'finished';
+  }
+
+  /**
+   * 每秒钟由 GameClock 调用
+   */
+  private onTick(): void {
+    if (this.state.phase !== 'playing') return;
+
+    const elapsed = (Date.now() - (this.state.gameStartTime || Date.now())) / 1000;
+
+    // 阶段推进（子类覆盖钩子）
+    this.checkPhaseAdvance(elapsed);
+
+    // 全局超时
+    const globalTimeout = this.getGlobalTimeout();
+    if (globalTimeout > 0 && elapsed >= globalTimeout) {
+      this.onGlobalTimeout();
+      return;
+    }
+
+    // Jump In 窗口超时
+    if (this.state.jumpInWindow && this.state.jumpInDeadline && Date.now() > this.state.jumpInDeadline) {
+      this.state.jumpInWindow = false;
+      this.state.jumpInDeadline = undefined;
+    }
+
+    // 回合超时
+    this.checkTurnTimeout();
+  }
+
+  // ============================================================================
+  // 子类可覆盖的钩子
+  // ============================================================================
+
+  protected getPhaseSeconds(): number[] { return []; }
+  protected getGlobalTimeout(): number { return 0; }
+
+  protected onPhaseAdvance(_phase: number): void { /* 子类覆盖 */ }
+
+  protected onGlobalTimeout(): void {
+    this.endGame(undefined);
+  }
+
+  // ============================================================================
+  // 内部：回合超时 / AI 调度 / 阶段推进
+  // ============================================================================
+
+  private checkPhaseAdvance(elapsed: number): void {
+    const phases = this.getPhaseSeconds();
+    for (let i = 0; i < phases.length; i++) {
+      if (elapsed >= phases[i] && (!this.state.outState || (this.state.outState as any).phase < i)) {
+        this.onPhaseAdvance(i);
+      }
+    }
+  }
+
+  private checkTurnTimeout(): void {
+    const currentId = this.state.tablePlayerIds[this.state.currentPlayerIndex];
+    if (!currentId) return;
+
+    const player = this.state.players.get(currentId);
+    if (!player) return;
+
+    const turnElapsed = (Date.now() - this.state.turnStartTime) / 1000;
+    if (turnElapsed >= this.config.turnTimer) {
+      console.log(`[BaseGameModeV2] 超时: ${player.nickname}，自动摸牌`);
+      this.handleAction({ type: 'draw', playerId: currentId, timestamp: Date.now() });
+      this.onStateChange?.();
+      return;
+    }
+
+    // AI 回合调度
+    if (player.isAI && this.lastScheduledAI !== currentId) {
+      this.lastScheduledAI = currentId;
+      this.handleAITurn(currentId);
+    }
+
+    // 非 AI 回合清除标记
+    if (!player.isAI) {
+      this.lastScheduledAI = null;
+    }
+  }
+
+  /**
+   * 处理 AI 完整回合（决策 → 延迟 → 执行 → 兜底）
+   */
+  private handleAITurn(playerId: string): void {
+    const player = this.state.players.get(playerId);
+    if (!player || !player.isAI) return;
+
+    console.log(`[AI] ${player.nickname} 回合开始，手牌${player.cards.length}张`);
+
+    const aiAction = AIPlayer.getAIAction(
+      player,
+      this.state as any,
+      [...this.state.players.values()]
+    );
+
+    const delay = AIPlayer.getDecisionDelay(player.aiDifficulty || 'normal');
+
+    setTimeout(() => {
+      if (aiAction) {
+        const action: GameActionV2 = {
+          type: aiAction.type as any,
+          playerId,
+          cardIds: aiAction.cardIds,
+          chosenColor: (aiAction as any).chosenColor,
+          comboType: (aiAction as any).comboType,
+          targetId: aiAction.targetId,
+          timestamp: Date.now(),
+        };
+
+        console.log(`[AI] ${player.nickname} 执行: ${action.type}` +
+          (action.cardIds ? ` ${action.cardIds.length}张` : ''));
+
+        const result = this.handleAction(action);
+        if (!result.success) {
+          console.log(`[AI] ${player.nickname} 动作被拒: ${result.error?.message}`);
+          this.aiFallbackDraw(playerId);
+        }
+      } else {
+        this.aiFallbackDraw(playerId);
+      }
+      this.onStateChange?.();
+    }, delay);
+  }
+
+  /**
+   * AI 兜底：摸牌 + 推进回合
+   */
+  private aiFallbackDraw(playerId: string): void {
+    this.executeDraw({ type: 'draw', playerId, timestamp: Date.now() });
+    this.playerManager.nextTurn();
+  }
+
+  // ============================================================================
+  // 状态序列化
+  // ============================================================================
+
+  /**
+   * 序列化公有游戏状态（广播给房间所有人）
+   */
+  serializePublicState(): any {
+    const s = this.state;
+    const pm = this.playerManager;
+
+    return {
+      version: 'v2',
+      phase: s.phase,
+      currentPlayerId: pm.getCurrentPlayerId(),
+      currentPlayerIndex: s.currentPlayerIndex,
+      direction: s.direction,
+
+      deckCount: s.deck.length,
+      discardPile: s.discardPile,
+      topCard: s.discardPile[s.discardPile.length - 1] || null,
+      currentColor: s.currentColor,
+
+      pendingDraw: s.pendingDraw || 0,
+      pendingDrawType: s.pendingDrawType,
+      penaltySourceId: s.penaltySourceId,
+      skippedPlayerId: s.skippedPlayerId,
+
+      players: pm.getAllPlayersInOrder().map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        cardCount: p.cards.length,
+        status: pm.isOnTable(p.id) ? 'ontable' : 'finished',
+        eliminated: p.eliminated,
+        hasCalledUno: p.hasCalledUno,
+        isAI: p.isAI,
+      })),
+
+      rankings: s.phase === 'finished' ? calculateResult(s).rankings : null,
+
+      penaltyStats: s.penaltyStats || {},
+      playerLastPlays: s.playerLastActions ? Object.fromEntries(s.playerLastActions) : {},
+      turnLog: s.turnLog || [],
+      outState: s.outState,
+      gameStartTime: s.gameStartTime,
+      phaseTimes: this.getPhaseSeconds(),
+
+      jumpInWindow: s.jumpInWindow || false,
+      jumpInDeadline: s.jumpInDeadline || 0,
+
+      lastPlay: s.lastAction ? {
+        playerId: s.lastAction.playerId,
+        type: s.lastAction.type,
+        cardCount: (s.lastAction.cardIds || []).length,
+        cards: this.resolveLastPlayCards(s.lastAction),
+      } : null,
+
+      turnStartTime: s.turnStartTime,
+      lastAction: s.lastAction,
+      onTableCount: pm.getOnTableCount(),
+    };
+  }
+
+  private resolveLastPlayCards(lastAction: GameActionV2): any[] {
+    return (lastAction.cardIds || []).map(cid => {
+      for (const p of this.state.players.values()) {
+        const found = p.cards.find(c => c.id === cid);
+        if (found) return found;
+      }
+      for (let i = this.state.discardPile.length - 1; i >= 0; i--) {
+        if (this.state.discardPile[i].id === cid) return this.state.discardPile[i];
+      }
+      return null;
+    }).filter(Boolean);
+  }
+
+  endGame(winnerId?: string): void {
+    this.state.phase = 'finished';
+    this.state.winnerId = winnerId;
+    this.clock?.stop();
+  }
+
+  /**
+   * 记录玩家动作的效果摘要（用于客户端每个玩家头像下的展示）
+   */
+  private recordPlayerActionSummary(action: GameActionV2): void {
+    if (!this.state.playerLastActions) {
+      this.state.playerLastActions = new Map();
+    }
+
+    const { type, playerId, cardIds, comboType } = action;
+    const player = this.state.players.get(playerId);
+    const cards = (cardIds || []).map(cid => {
+      // 从弃牌堆顶部查找已打出的牌
+      for (let i = this.state.discardPile.length - 1; i >= 0; i--) {
+        if (this.state.discardPile[i].id === cid) return this.state.discardPile[i];
+      }
+      return player?.cards.find(c => c.id === cid) || null;
+    }).filter(Boolean);
+
+    let label = '';
+    let effect = '';
+    const pending = this.state.pendingDraw || 0;
+    const skipped = this.state.skippedPlayerId;
+
+    if (type === 'combo' && comboType) {
+      const n = cardIds?.length || 0;
+      if (comboType === 'pair') label = `对子×${n}`;
+      else if (comboType === 'three') label = n >= 5 ? `核弹${n}张` : n >= 4 ? `炸弹${n}张` : `三条`;
+      else if (comboType === 'rainbow') label = `彩虹`;
+      else if (comboType === 'straight') label = `顺子`;
+      // 连打效果
+      effect = this.getComboEffectSummary(comboType, n);
+    } else if (type === 'play' || type === 'jumpIn') {
+      if (pending > 0) effect = `+${pending}累加`;
+      else if (skipped) effect = `跳过`;
+      else {
+        const card = cards[0];
+        if (card?.type === 'skip') effect = `跳过`;
+        else if (card?.type === 'reverse') effect = `反转`;
+        else if (card?.type === 'draw2') effect = `+2`;
+        else if (card?.type === 'draw4') effect = `+4万能`;
+        else if (card?.type === 'draw8') effect = `+8万能`;
+        else if (card?.type === 'wild') effect = `变色`;
+        else effect = '';
+      }
+    } else if (type === 'draw') {
+      if (pending > 0) effect = `硬吃+${pending}`;
+      else effect = `摸牌`;
+    } else if (type === 'uno') {
+      effect = `UNO!`;
+    } else if (type === 'challenge') {
+      effect = `质疑!`;
+    } else if (type === 'reverse') {
+      effect = `弹回!`;
+    }
+
+    this.state.playerLastActions.set(playerId, {
+      type, label, cardCount: cards.length, cards: cards.slice(0, 5), effect, timestamp: Date.now(),
+    });
+
+    // 追加到回合日志
+    if (!this.state.turnLog) this.state.turnLog = [];
+    this.state.turnLog.push({
+      playerId,
+      nickname: player?.nickname || '?',
+      type,
+      label,
+      cards: cards.slice(0, 5),
+      effect,
+      timestamp: Date.now(),
+    });
+    // 保留最近30条
+    if (this.state.turnLog.length > 30) this.state.turnLog.shift();
+  }
+
+  private getComboEffectSummary(comboType: string, cardCount: number): string {
+    switch (comboType) {
+      case 'pair': return '连出2张(无惩罚)';
+      case 'three':
+        if (cardCount >= 5) return '核弹:全员摸3张';
+        if (cardCount >= 4) return '炸弹:下家摸2张';
+        return '三条:连出3张(无惩罚)';
+      case 'rainbow': return '彩虹:指定目标摸3张';
+      case 'straight': return `顺子:下家摸${cardCount - 2}张`;
+      default: return '';
+    }
+  }
+
+  // ============================================================================
   // 获取状态
   // ============================================================================
-  
+
   getState(): GameStateV2 {
     return this.state;
   }
-  
+
   getPlayerManager(): PlayerManager {
     return this.playerManager;
   }

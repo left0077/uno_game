@@ -140,10 +140,6 @@ export enum SocketEvents {
   GAME_DRAW = 'game:draw',
   GAME_UNO = 'game:uno',
   GAME_CHALLENGE = 'game:challenge',
-  GAME_JUMP = 'game:jump',
-
-  // 游戏状态 (Server→Client)
-  GAME_STATE = 'game:state',
 
   // AI
   ADD_AI = 'ai:add',
@@ -155,7 +151,6 @@ export enum SocketEvents {
 
   // 聊天
   CHAT_SEND = 'chat:send',
-  CHAT_MESSAGE = 'chat:message',
 
   ERROR = 'error',
 }

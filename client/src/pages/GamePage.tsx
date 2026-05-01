@@ -4,15 +4,12 @@
  * 柔和赌场风格版本
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Card } from '../components/Card';
 import { PhaseTimer } from '../components/game/PhaseTimer';
 import { EmojiOverlay } from '../components/EmojiOverlay';
 import type { Card as CardType } from '../../../shared/types';
-import { GAME_CONFIG } from '../config';
-
-interface EmojiMsg { playerId: string; emoji: any; target?: string; timestamp: number }
 
 interface GamePageProps {
   gameActions: {
@@ -20,7 +17,6 @@ interface GamePageProps {
     playCombo: (cardIds: string[], comboType: 'pair' | 'three' | 'rainbow' | 'straight', chosenColor?: string) => boolean;
     drawCard: () => boolean;
     callUno: () => boolean;
-    setJump: (jump: boolean) => void;
     canPlay: (cardId: string) => boolean;
     canDraw: () => boolean;
     canCallUno: () => boolean;
@@ -40,6 +36,7 @@ interface GamePageProps {
 export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmoji }: GamePageProps) {
   const store = useGameStore();
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [pendingCardId, setPendingCardId] = useState<string | null>(null);
   const [selectedCards, setSelectedCards] = useState<string[]>([]); // 按点击顺序排列，最后一张决定跟牌
 
@@ -47,10 +44,10 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
   const room = store.room;
   const isMyTurn = gameActions.isMyTurn();
   const canPlay = gameActions.canPlay;
-  const hasPlayableCards = gameActions.myHand.some(c => canPlay(c.id));
   const pendingDraw = gameState?.pendingDraw || 0;
   const comboOptions = gameActions.comboOptions || [];
-  const penaltyInfo = gameActions.penaltyInfo;
+
+  const onChallenge = (id: string) => gameActions.challengePlayer(id);
 
   // 选中的可单出牌
   const selectedPlayable = selectedCards.filter(id => canPlay(id));
@@ -131,14 +128,6 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
     }
   }, [gameActions]);
 
-  // 处理喊 UNO（手牌 ≤ 2 时可喊）
-  const handleCallUno = useCallback(() => {
-    gameActions.callUno();
-  }, [gameActions]);
-
-  // 获取当前玩家
-  const currentPlayer = room?.players.find(p => p.id === gameState?.currentPlayerId);
-
   if (!gameState || !room) {
     return (
       <div className="min-h-screen flex items-center justify-center relative z-10">
@@ -150,62 +139,121 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
     );
   }
 
-  const lastPlay = (gameState as any).lastPlay;
   const canUno = gameActions.myHand.length <= 2;
   const myUnoCalled = room?.players.find(p => p.id === store.userId)?.hasCalledUno;
   const [unoClicked, setUnoClicked] = useState(false);
   const handleClickUno = () => { setUnoClicked(true); gameActions.callUno(); setTimeout(() => setUnoClicked(false), 1000); };
 
+  const isOut = !!gameState.outState;
+  const allPlayers = gameState?.players || room?.players || [];
+  const myId = store.userId;
+
+  // 门字形：我居中在下，其他玩家顺时针环绕（左 | 上 | 右）
+  const meIdx = allPlayers.findIndex(p => p.id === myId);
+  // 从"我"的位置开始重排，让顺时针顺序在视觉上正确
+  const rotated = meIdx >= 0 ? [...allPlayers.slice(meIdx), ...allPlayers.slice(0, meIdx)] : allPlayers;
+  const rotatedOthers = rotated.filter(p => p.id !== myId);
+  let topRow: typeof allPlayers = [], leftCol: typeof allPlayers = [], rightCol: typeof allPlayers = [];
+  {
+    const n = rotatedOthers.length;
+    if (n <= 3) { topRow = rotatedOthers; }
+    else if (n <= 5) {
+      leftCol = rotatedOthers.slice(0, 1); topRow = rotatedOthers.slice(1, n - 1); rightCol = rotatedOthers.slice(n - 1);
+    } else {
+      const side = Math.ceil(n / 4);
+      leftCol = rotatedOthers.slice(0, side); topRow = rotatedOthers.slice(side, n - side); rightCol = rotatedOthers.slice(n - side);
+    }
+  }
+
+  const pp = (gameState as any).playerLastPlays || {};
+  const pe = getLatestEmojis(emojiMessages || []);
+  const ps = (gameState as any).penaltyStats || {};
+
   return (
-    <div className="min-h-screen bg-casino flex flex-col relative z-10">
-      {/* ====== 顶部栏 ====== */}
-      <div className="grid grid-cols-3 items-center px-3 py-2 casino-card mx-2 mt-2 gap-2">
+    <div className="h-dvh bg-casino flex flex-col relative z-10 overflow-hidden">
+      {/* ====== 顶栏 ====== */}
+      <div className="flex items-center justify-between px-2 py-1 casino-card mx-1 mt-1 flex-shrink-0 h-[36px]">
+        <div className="w-[60px] flex items-center"><NetworkDot /></div>
         <div className="flex items-center gap-2">
-          <span className="text-cream-muted text-xs">房间</span>
-          <span className="font-mono font-bold text-gold-light text-sm">{room.code}</span>
-          <ConnectionStatus />
-        </div>
-        <div className="flex justify-center items-center gap-2">
-          <span className="text-gold font-bold text-lg">{typeof gameState.direction === 'string' ? (gameState.direction === 'clockwise' ? '→' : '←') : gameState.direction === 1 ? '→' : '←'}</span>
-          {gameState.outState && gameState.gameStartTime && (
+          <span className="text-gold font-bold text-base">{gameState.direction === 'counterclockwise' || gameState.direction === -1 ? '←' : '→'}</span>
+          {isOut && gameState.gameStartTime ? (
             <PhaseTimer gameStartTime={gameState.gameStartTime} phaseTimes={(gameState as any).phaseTimes || [180, 360, 540]} currentPhase={gameState.outState.phase} maxCards={gameState.outState.maxCards} turnTimer={gameState.turnTimer} turnStartTime={gameState.turnStartTime} isMyTurn={isMyTurn} />
+          ) : (
+            <span className="text-cream-muted/60 text-xs">{isMyTurn ? '你的回合' : '等待中'}</span>
           )}
         </div>
-        <div className="flex justify-end">
-          <button onClick={onLeaveRoom} className="btn-soft-red px-3 py-1 text-xs rounded-lg">离开</button>
+        <div className="w-[60px] flex justify-end">
+          <button onClick={() => setShowRules(true)} className="w-7 h-7 text-xs rounded-full bg-felt-dark/60 border border-gold/30 text-gold-light flex items-center justify-center">?</button>
         </div>
       </div>
 
-      {/* ====== 玩家头像行 ====== */}
-      <OtherPlayers players={gameState.players || room.players} currentPlayerId={gameState.currentPlayerId} penaltyStats={(gameState as any).penaltyStats || {}} onChallenge={(id: string) => gameActions.challengePlayer(id)} />
+      {/* ====== 上排对手 ====== */}
+      <PlayerRow players={topRow} currentPlayerId={gameState.currentPlayerId} penaltyStats={ps} playerLastPlays={pp} playerEmojis={pe} onChallenge={onChallenge} />
 
-      {/* ====== 主游戏区 ====== */}
-      <div className="flex-1 flex flex-col items-center justify-center px-2 gap-3 max-w-lg mx-auto w-full">
+      {/* ====== 中央：左 | 弃牌+日志 | 右 ====== */}
+      <div className="flex-1 flex gap-1 px-1 min-h-0 py-0.5">
+        <PlayerCol players={leftCol} currentPlayerId={gameState.currentPlayerId} penaltyStats={ps} playerLastPlays={pp} playerEmojis={pe} onChallenge={onChallenge} />
 
-        {/* 牌堆 + 颜色 */}
-        <div className="flex items-center justify-center gap-6 mt-2">
-          <DiscardPile topCard={gameState.topCard} />
-          {pendingDraw > 0 && (
-            <div className="text-red-400 font-bold text-lg animate-pulse">+{pendingDraw}</div>
-          )}
-          <DrawPile onDraw={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} />
-        </div>
-        <ColorDot color={gameState.currentColor} />
-
-        {/* 上家出牌提示 */}
-        {lastPlay?.cards?.length > 0 && (
-          <div className="text-cream-muted/60 text-xs text-center animate-fade-in">
-            {(() => {
-              const p = (gameState.players || room?.players || []).find((x: any) => x.id === lastPlay.playerId);
-              return `${p?.nickname || '?'} 出了 ${lastPlay.type === 'combo' ? `${lastPlay.cardCount}张` : ''}`;
-            })()}
+        <div className="flex-1 flex flex-col gap-1 min-w-0">
+          <div className="flex-1 flex gap-1 min-h-0">
+            {/* 弃牌堆 */}
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <div className="relative">
+                <DiscardPile topCard={gameState.topCard} />
+                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5">
+                  <ColorDot color={gameState.currentColor} />
+                  {pendingDraw > 0 && (
+                    <div className="text-red-400 font-bold text-[10px] bg-felt-dark/80 px-1 rounded-full animate-pulse whitespace-nowrap">+{pendingDraw}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {/* 日志：和弃牌等高 */}
+            <div className="flex-1 min-w-0">
+              <TurnLog entries={(gameState as any).turnLog || []} emojiMessages={emojiMessages || []} players={allPlayers} />
+            </div>
           </div>
-        )}
 
-        {/* 状态提示 */}
-        <StatusHint isMyTurn={isMyTurn} pendingDraw={pendingDraw} hasPlayable={hasPlayableCards} />
+          {/* 我：居中在下 */}
+          <div className="flex justify-center flex-shrink-0">
+            <PlayerBlock
+              player={allPlayers.find(p => p.id === myId)!}
+              isCurrent={gameState.currentPlayerId === myId}
+              penalty={ps[myId] || 0}
+              lastPlay={pp[myId]}
+              emoji={pe[myId]}
+            />
+          </div>
+        </div>
 
-        {/* 手牌 */}
+        <PlayerCol players={rightCol} currentPlayerId={gameState.currentPlayerId} penaltyStats={ps} playerLastPlays={pp} playerEmojis={pe} onChallenge={onChallenge} />
+      </div>
+
+      {/* ====== 操作按钮 ====== */}
+      <div className="flex-shrink-0 px-2 pb-1">
+        <div className="flex gap-2 max-w-xs mx-auto">
+          {selectedCards.length > 0 && isMyTurn && (selectedCards.length === 1 || activeCombo) ? (
+            <>
+              <button onClick={() => setSelectedCards([])} className="flex-1 h-10 bg-felt-dark/60 border border-gold/20 text-cream-muted rounded-xl text-sm">取消</button>
+              <button onClick={handleConfirmPlay} className="flex-[2] h-10 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl shadow-lg active:scale-95 text-sm">{activeCombo ? activeCombo.label : '出牌'}</button>
+            </>
+          ) : selectedCards.length > 1 && !activeCombo && isMyTurn ? (
+            <button onClick={() => setSelectedCards([])} className="flex-1 h-10 bg-amber-900/40 border border-amber-500/30 text-amber-300 rounded-xl text-sm">{selectedCards.length}张未成连打·取消</button>
+          ) : (
+            <>
+              <button onClick={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} className="flex-1 h-10 btn-soft-blue text-sm rounded-xl disabled:opacity-40 font-medium">摸牌</button>
+              <button onClick={handleClickUno} disabled={!canUno || !!myUnoCalled || unoClicked} className={`flex-1 h-10 text-sm rounded-xl font-bold transition-all ${
+                myUnoCalled ? 'bg-emerald-700 text-white border border-emerald-400' :
+                unoClicked ? 'bg-yellow-500 text-black scale-95' :
+                canUno ? 'btn-soft-red animate-pulse' : 'bg-felt-dark/60 text-cream-muted/40 cursor-not-allowed'
+              }`}>{myUnoCalled ? 'UNO ✓' : unoClicked ? '已喊!' : 'UNO!'}</button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ====== 手牌 ====== */}
+      <div className="flex-shrink-0 pb-1">
         <MyHand
           cards={gameActions.myHand}
           isMyTurn={isMyTurn}
@@ -214,176 +262,158 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
           onCardClick={handleCardClick}
           canPlay={gameActions.canPlay}
         />
-
       </div>
 
-        {/* 底部操作栏 */}
-        <div className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-felt-dark/95 via-felt-dark/80 to-transparent px-4 py-3 pb-6">
-          <div className="flex justify-center mb-2">
-            <EmojiBar onSend={gameActions.sendEmoji} />
-          </div>
-          <div className="flex items-center justify-center gap-4 max-w-md mx-auto">
-            {selectedCards.length > 0 && isMyTurn && (selectedCards.length === 1 || activeCombo) && (
-              <>
-                <button onClick={() => setSelectedCards([])} className="flex-1 py-3 bg-felt-dark/60 border border-gold/20 text-cream-muted rounded-xl text-sm">取消</button>
-                <button onClick={handleConfirmPlay} className="flex-[2] py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl shadow-lg active:scale-95 text-base">{activeCombo ? `${activeCombo.label} 连打` : '出牌'}</button>
-              </>
-            )}
-            {selectedCards.length > 1 && !activeCombo && isMyTurn && (
-              <button onClick={() => setSelectedCards([])} className="w-full py-3 bg-amber-900/40 border border-amber-500/30 text-amber-300 rounded-xl text-sm">{selectedCards.length}张未形成连打 · 点击取消</button>
-            )}
-            {!(selectedCards.length > 0 && isMyTurn) && (
-              <>
-                <button onClick={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} className="flex-1 py-3 btn-soft-blue text-sm rounded-xl disabled:opacity-40 font-medium">摸牌</button>
-                <button onClick={handleClickUno} disabled={!canUno || !!myUnoCalled || unoClicked} className={`flex-1 py-3 text-sm rounded-xl font-bold transition-all ${
-                  myUnoCalled ? 'bg-emerald-700 text-white border border-emerald-400' :
-                  unoClicked ? 'bg-yellow-500 text-black scale-95' :
-                  canUno ? 'btn-soft-red animate-pulse' : 'bg-felt-dark/60 text-cream-muted/40 cursor-not-allowed'
-                }`}>{myUnoCalled ? 'UNO ✓' : unoClicked ? '已喊!' : 'UNO!'}</button>
-              </>
-            )}
-          </div>
-        </div>
+      {/* ====== 表情栏 ====== */}
+      <EmojiBar onSend={gameActions.sendEmoji} />
 
       {/* 弹窗 */}
       {showColorPicker && <ColorPickerModal onSelect={handleColorSelect} onCancel={() => setShowColorPicker(false)} />}
-      <EmojiOverlay messages={emojiMessages || []} players={gameState?.players || room?.players || []} onDismiss={onDismissEmoji || (() => {})} />
+      {showRules && <RulesModal mode={isOut ? 'out' : 'standard'} onClose={() => setShowRules(false)} />}
+      <EmojiOverlay messages={emojiMessages || []} players={allPlayers} onDismiss={onDismissEmoji || (() => {})} />
     </div>
   );
 }
 
-// ========== 旧子组件已删除 ==========
-function OtherPlayers({
-  players,
-  currentPlayerId,
-  penaltyStats,
-  onChallenge
-}: {
-  players: { id: string; nickname: string; cardCount?: number; isAI?: boolean; status?: string; eliminated?: boolean; hasCalledUno?: boolean }[];
-  currentPlayerId: string;
-  penaltyStats: Record<string, number>;
-  onChallenge: (id: string) => boolean;
+function getLatestEmojis(msgs: Array<{ playerId: string; emoji: string }>): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const m of msgs) map[m.playerId] = m.emoji;
+  return map;
+}
+
+// ========== 子组件 ==========
+
+function TurnLog({ entries, emojiMessages, players }: {
+  entries: Array<{ playerId: string; nickname: string; type: string; label: string; cards: any[]; effect: string; timestamp: number }>;
+  emojiMessages: Array<{ playerId: string; emoji: string; timestamp: number }>;
+  players: any[];
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const timeline = [
+    ...entries.map(e => ({ ...e, kind: 'action' as const })),
+    ...emojiMessages.map(m => {
+      const p = players.find((x: any) => x.id === m.playerId);
+      return { playerId: m.playerId, nickname: p?.nickname || '?', kind: 'emoji' as const, emoji: m.emoji, timestamp: m.timestamp, label: '', cards: [], effect: '', type: '' };
+    }),
+  ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [timeline.length]);
+
+  if (!timeline.length) return <div className="h-full flex items-center justify-center text-cream-muted/20 text-[10px]">回合记录</div>;
   return (
-    <div className="flex justify-center gap-1.5 sm:gap-3 flex-wrap px-1">
-      {players.map((player, idx) => {
-        const isCurrent = player.id === currentPlayerId;
-        const isFinished = player.status === 'finished';
-        const isEliminated = player.eliminated;
-        const canChallenge = player.cardCount === 1 && !player.hasCalledUno && player.id !== currentPlayerId;
+    <div ref={ref} className="h-full overflow-y-auto scrollbar-thin text-[10px] leading-relaxed">
+      {timeline.slice(-30).map((e, i) => (
+        <div key={i} className="px-1 py-0.5 border-b border-gold/5 last:border-0">
+          {e.kind === 'emoji' ? (
+            <span><span className="text-cream-muted/40">{e.nickname}</span> <span className="text-sm">{e.emoji}</span></span>
+          ) : (
+            <span>
+              <span className="text-cream-muted/40">{e.nickname}</span>
+              {e.cards?.length > 0 && e.cards.slice(0, 3).map((c: any, j: number) => (
+                <span key={j} className={c?.color==='red'?'text-red-400':c?.color==='yellow'?'text-yellow-300':c?.color==='green'?'text-green-400':c?.color==='blue'?'text-blue-400':''}> {c?.type==='skip'?'🚫':c?.type==='reverse'?'🔄':c?.type?.startsWith('draw')?`+${c.type.replace('draw','')}`:c?.type==='wild'?'🌈':c?.value??'?'}</span>
+              ))}
+              {e.label && <span className="text-purple-300/70"> {e.label}</span>}
+              {e.effect && <span className="text-cream-muted/50"> {e.effect}</span>}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
-        return (
-          <div
-            key={player.id}
-            onClick={canChallenge ? () => onChallenge(player.id) : undefined}
-            className={`relative px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border transition-all ${
-              canChallenge
-                ? 'bg-yellow-600/30 border-yellow-400/60 cursor-pointer hover:bg-yellow-500/40 animate-pulse'
-                : isCurrent
-                ? 'bg-gold/20 border-gold/50 shadow-lg shadow-gold/10 scale-105'
-                : isFinished
-                ? 'bg-emerald-900/30 border-emerald-500/40'
-                : isEliminated
-                ? 'bg-red-900/20 border-red-500/30 opacity-60'
-                : 'bg-felt-dark/60 border-gold/10'
-            }`}
-          >
-            {/* 排名角标 */}
-            {isFinished && (
-              <span className="absolute -top-2 -right-2 text-lg">
-                {idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : ''}
-              </span>
-            )}
-            {isEliminated && (
-              <span className="absolute -top-2 -right-2 text-xs bg-red-600 text-white px-1 rounded">OUT</span>
-            )}
+function NetworkDot() {
+  const [on, setOn] = useState(navigator.onLine);
+  useEffect(() => {
+    const go = () => setOn(navigator.onLine);
+    window.addEventListener('online', go); window.addEventListener('offline', go);
+    return () => { window.removeEventListener('online', go); window.removeEventListener('offline', go); };
+  }, []);
+  return <span className={`w-2 h-2 rounded-full ${on ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'}`} title={on ? '在线' : '离线'} />;
+}
 
-            <div className="flex items-center gap-1">
-              {isCurrent && (
-                <span className="w-1.5 h-1.5 bg-gold rounded-full animate-pulse" />
-              )}
-              <span className={`text-xs sm:text-sm font-medium truncate max-w-[50px] sm:max-w-[80px] ${
-                isCurrent ? 'text-gold-light' : isFinished ? 'text-emerald-300' : 'text-cream'
-              }`}>
-                {player.nickname}
-              </span>
-              {player.isAI && (
-                <span className="text-[10px] text-blue-300/70">AI</span>
-              )}
-              {player.hasCalledUno && (
-                <span className="text-[10px] bg-red-600 text-white px-1 rounded font-bold animate-pulse">UNO!</span>
-              )}
-            </div>
-            <div className="text-cream-muted/60 text-[10px] sm:text-xs text-center mt-0.5">
-              {isFinished ? '🏆 完成!' : isEliminated ? '💀 淘汰' : `${player.cardCount ?? 0} 张`}
-              {(penaltyStats[player.id] || 0) > 0 && (
-                <span className="text-red-400/70 ml-1">😭+{penaltyStats[player.id]}</span>
-              )}
-            </div>
-          </div>
-        );
-      })}
+function actionEmoji(lastPlay: any): string {
+  if (!lastPlay) return '';
+  if (lastPlay.type === 'combo') return lastPlay.label?.includes('炸弹') ? '💣' : lastPlay.label?.includes('核弹') ? '☢️' : lastPlay.label?.includes('彩虹') ? '🌈' : lastPlay.label?.includes('顺子') ? '📐' : '🔥';
+  if (lastPlay.type === 'draw') return '📥';
+  if (lastPlay.type === 'uno') return '🚨';
+  if (lastPlay.type === 'challenge') return '🔍';
+  const c = lastPlay.cards?.[0];
+  if (!c) return '';
+  if (c.type === 'skip') return '🚫';
+  if (c.type === 'reverse') return '🔄';
+  if (c.type?.startsWith('draw')) return '😈';
+  if (c.type === 'wild') return '🌈';
+  return '';
+}
+
+function PlayerBlock({ player, isCurrent, penalty, lastPlay, emoji }: {
+  player: { id: string; nickname: string; cardCount?: number; isAI?: boolean; status?: string; eliminated?: boolean; hasCalledUno?: boolean };
+  isCurrent: boolean; penalty: number; lastPlay: any; emoji: string;
+}) {
+  if (!player) return null;
+  const isFinished = player.status === 'finished';
+  const act = actionEmoji(lastPlay);
+  return (
+    <div className={`w-[55px] text-center px-0.5 py-0.5 rounded border ${
+      isCurrent ? 'bg-gold/20 border-gold/50' :
+      isFinished ? 'bg-emerald-900/30 border-emerald-500/40' :
+      player.eliminated ? 'bg-red-900/20 border-red-500/30 opacity-50' :
+      'bg-felt-dark/40 border-gold/5'
+    }`}>
+      <div className="flex items-center justify-center gap-0.5">
+        {isCurrent && <span className="w-1 h-1 bg-gold rounded-full flex-shrink-0" />}
+        <span className={`text-[10px] font-medium truncate ${isCurrent ? 'text-gold-light' : 'text-cream-muted/80'}`}>{player.nickname}</span>
+      </div>
+      <div className="text-[9px] text-cream-muted/50 leading-tight flex items-center justify-center gap-0.5 flex-wrap">
+        {isFinished ? '🏆' : player.eliminated ? '💀' : <>{player.cardCount ?? 0}张</>}
+        {player.hasCalledUno && <span className="text-red-400 font-bold">UNO</span>}
+        {penalty > 0 && <span className="text-red-400/70">😭{penalty}</span>}
+        {act && <span>{act}</span>}
+        {emoji && <span className="text-[11px] leading-none">{emoji}</span>}
+      </div>
+    </div>
+  );
+}
+
+function PlayerRow({ players, currentPlayerId, penaltyStats, playerLastPlays, playerEmojis, onChallenge }: any) {
+  if (!players.length) return null;
+  return (
+    <div className="flex justify-center gap-0.5 px-1 flex-shrink-0">
+      {players.map((p: any) => (
+        <div key={p.id} onClick={p.cardCount === 1 && !p.hasCalledUno && p.id !== currentPlayerId ? () => onChallenge(p.id) : undefined}
+          className={p.cardCount === 1 && !p.hasCalledUno && p.id !== currentPlayerId ? 'cursor-pointer rounded border border-yellow-400/60' : ''}>
+          <PlayerBlock player={p} isCurrent={p.id === currentPlayerId} penalty={penaltyStats[p.id] || 0} lastPlay={playerLastPlays[p.id]} emoji={playerEmojis[p.id]} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlayerCol({ players, currentPlayerId, penaltyStats, playerLastPlays, playerEmojis, onChallenge }: any) {
+  if (!players.length) return <div className="flex-shrink-0 w-[55px]" />;
+  return (
+    <div className="flex flex-col justify-center gap-0.5 flex-shrink-0 w-[55px]">
+      {players.map((p: any) => (
+        <div key={p.id} onClick={p.cardCount === 1 && !p.hasCalledUno && p.id !== currentPlayerId ? () => onChallenge(p.id) : undefined}
+          className={p.cardCount === 1 && !p.hasCalledUno && p.id !== currentPlayerId ? 'cursor-pointer rounded border border-yellow-400/60' : ''}>
+          <PlayerBlock player={p} isCurrent={p.id === currentPlayerId} penalty={penaltyStats[p.id] || 0} lastPlay={playerLastPlays[p.id]} emoji={playerEmojis[p.id]} />
+        </div>
+      ))}
     </div>
   );
 }
 
 function DiscardPile({ topCard }: { topCard?: CardType }) {
-  if (!topCard) {
-    return (
-      <div className="w-20 h-28 bg-felt-dark/80 rounded-xl border-2 border-gold/20 flex items-center justify-center shadow-lg">
-        <span className="text-gold/40 text-2xl">🃏</span>
-      </div>
-    );
-  }
-
   return (
-    <Card
-      card={topCard}
-      size="md"
-      disabled
-    />
-  );
-}
-
-function DrawPile({ onDraw, disabled }: { onDraw: () => void; disabled: boolean }) {
-  return (
-    <button
-      onClick={onDraw}
-      disabled={disabled}
-      className={`relative w-16 h-24 sm:w-24 sm:h-36 rounded-xl shadow-lg flex items-center justify-center
-        bg-gradient-to-br from-blue-800 via-indigo-800 to-slate-800
-        border-2 border-gold/40
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 cursor-pointer'}
-        transition-all duration-300 active:scale-95 sm:active:scale-100`}
-    >
-      <span className="text-gold text-lg sm:text-2xl font-bold tracking-wider">UNO</span>
-      {/* 柔和光点 */}
-      <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 w-1 h-1 sm:w-1.5 sm:h-1.5 bg-gold/50 rounded-full" />
-      <div className="absolute bottom-1.5 left-1.5 sm:bottom-2 sm:left-2 w-1 h-1 sm:w-1.5 sm:h-1.5 bg-gold/50 rounded-full" />
-      {/* 可抽牌提示 */}
-      {!disabled && (
-        <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-600 rounded-full animate-pulse border-2 border-gold/50" />
+    <div className="w-[72px] h-[100px] flex items-center justify-center">
+      {topCard ? (
+        <Card card={topCard} size="md" disabled />
+      ) : (
+        <div className="w-full h-full bg-felt-dark/80 rounded-xl border-2 border-gold/20 flex items-center justify-center">
+          <span className="text-gold/40 text-xl">🃏</span>
+        </div>
       )}
-    </button>
-  );
-}
-
-function ColorIndicator({ color }: { color: string }) {
-  const colorConfig: Record<string, { bg: string; label: string; border: string }> = {
-    red: { bg: 'bg-uno-red', label: '红色', border: 'border-red-300' },
-    blue: { bg: 'bg-uno-blue', label: '蓝色', border: 'border-blue-300' },
-    green: { bg: 'bg-uno-green', label: '绿色', border: 'border-green-300' },
-    yellow: { bg: 'bg-uno-yellow', label: '黄色', border: 'border-yellow-300' },
-    wild: { bg: 'bg-uno-wild', label: '万能', border: 'border-slate-600' }
-  };
-
-  const config = colorConfig[color] || colorConfig.wild;
-
-  return (
-    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2 sm:py-3 casino-card">
-      <span className="text-cream-muted text-xs sm:text-sm">当前颜色:</span>
-      <div className={`w-5 h-5 sm:w-7 sm:h-7 rounded-full ${config.bg} border-2 ${config.border} shadow-md`} />
-      <span className="text-gold font-medium text-xs sm:text-sm">{config.label}</span>
     </div>
   );
 }
@@ -416,7 +446,7 @@ function MyHand({
   });
 
   return (
-    <div className="flex justify-center items-end gap-0.5 sm:gap-1 py-3 sm:py-4 overflow-x-auto px-2">
+    <div className="flex justify-center items-end gap-0.5 px-2 overflow-x-auto">
       {sorted.map((card, idx) => {
         const playable = isMyTurn && canPlay(card.id);
         const isCombo = comboCards.has(card.id);
@@ -454,41 +484,74 @@ function MyHand({
   );
 }
 
-function GameControls({
-  isMyTurn,
-  canDraw,
-  canCallUno,
-  onDrawCard,
-  onCallUno
-}: {
-  isMyTurn: boolean;
-  canDraw: boolean;
-  canCallUno: boolean;
-  onDrawCard: () => void;
-  onCallUno: () => void;
-}) {
+function RulesModal({ mode, onClose }: { mode: 'standard' | 'out'; onClose: () => void }) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 sm:relative sm:bottom-auto sm:left-auto sm:right-auto
-      flex justify-center gap-4 sm:gap-4 mt-4 sm:mt-6 p-3 sm:p-0
-      bg-gradient-to-t from-felt/95 via-felt/80 to-transparent sm:bg-none z-20">
-      <button
-        onClick={onDrawCard}
-        disabled={!isMyTurn || !canDraw}
-        className="px-8 sm:px-8 py-3 sm:py-3 btn-soft-blue text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed min-w-[100px] sm:min-w-[100px] active:scale-95 transition-all rounded-xl font-medium"
-      >
-        摸牌
-      </button>
-      <button
-        onClick={onCallUno}
-        disabled={!canCallUno}
-        className={`px-8 sm:px-8 py-3 sm:py-3 text-base sm:text-lg rounded-xl font-bold transition-all min-w-[100px] sm:min-w-[100px] active:scale-95
-          ${canCallUno
-            ? 'btn-soft-red animate-pulse'
-            : 'bg-felt-dark/60 text-cream-muted border border-gold/20 cursor-not-allowed'
-        }`}
-      >
-        UNO!
-      </button>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto" onClick={onClose}>
+      <div className="casino-card p-5 max-w-md w-full text-xs" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-gold-light text-lg font-bold">{mode === 'out' ? 'Out 大逃杀' : '经典 UNO'} 规则</h2>
+          <button onClick={onClose} className="text-cream-muted/50 hover:text-cream">✕</button>
+        </div>
+
+        <div className="space-y-3 text-cream-muted/80 leading-relaxed">
+          {/* 基础规则 */}
+          <Section title="🎴 基础出牌">
+            匹配 <b className="text-gold-light/80">颜色</b> 或 <b className="text-gold-light/80">数字</b> 相同的牌。
+            <span className="text-purple-300">万能牌</span> (+4/+8/wild) 随时可出，出后选色。
+          </Section>
+
+          <Section title="😈 惩罚叠加">
+            被 +2/+3/+4/+5/+8 后，可跟任意类型 + 牌累加传给下家，或出反转弹回给上家。
+            不跟则摸相应张数。
+          </Section>
+
+          <Section title="🚨 UNO & 质疑">
+            手牌 ≤2 张时可随时喊 UNO。剩 1 张没喊 UNO 的玩家可被他人<b className="text-yellow-300">质疑</b>（罚 2 张）。
+          </Section>
+
+          {mode === 'out' && (
+            <>
+              <Section title="📐 连打系统">
+                <b>对子</b>：2 张同数字（无惩罚）<br/>
+                <b>三条</b>：3 张同数字（无惩罚）<br/>
+                <b>💣 炸弹</b>：4 张同数字 → 下家跳过+摸2<br/>
+                <b>☢️ 核弹</b>：5 张同数字 → 全员摸3<br/>
+                <b>🌈 彩虹</b>：4 色同数字 → 目标摸3<br/>
+                <b>📐 顺子</b>：3+ 张同色连续 → 下家摸(N-2)张<br/>
+                <span className="text-amber-300">惩罚期间连打=护盾：惩罚继续传下家</span>
+              </Section>
+
+              <Section title="⏱️ 阶段机制">
+                <b>手牌上限 20</b>，超出即淘汰。<br/>
+                Phase 1 (3分钟) 注入 +3 牌<br/>
+                Phase 2 (6分钟) 注入 +5 牌<br/>
+                Phase 3 (9分钟) 注入 +8 万能牌<br/>
+                20 分钟全局超时，存活者胜。
+              </Section>
+            </>
+          )}
+
+          <Section title="⏭️ 功能牌">
+            <b>🚫 跳过</b>：跳过下家回合<br/>
+            <b>🔄 反转</b>：反转出牌方向<br/>
+            <b>🎨 变色</b>：自选颜色<br/>
+            <b>⏩ 抢出</b>：手牌与顶牌完全相同可抢出
+          </Section>
+        </div>
+
+        <button onClick={onClose} className="w-full mt-5 py-2.5 bg-felt-dark/60 border border-gold/20 text-gold rounded-lg hover:border-gold/40 transition-all text-sm">
+          知道了
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-gold-light/90 font-medium mb-0.5">{title}</div>
+      <div className="text-cream-muted/70">{children}</div>
     </div>
   );
 }
@@ -538,118 +601,24 @@ function ColorPickerModal({
   );
 }
 
-function LastPlayDisplay({ lastPlay, players }: { lastPlay: any; players: any[] }) {
-  if (!lastPlay || !lastPlay.cards?.length) return null;
-  const player = players.find((p: any) => p.id === lastPlay.playerId);
-  const colorEmoji: Record<string, string> = { red: '🔴', yellow: '🟡', green: '🟢', blue: '🔵', wild: '⚫' };
-  const label = (c: any) => `${colorEmoji[c?.color] || ''}${c?.type === 'number' ? c.value : (c?.type || '?')}`;
-
-  const cards = lastPlay.cards;
-  const rest = cards.slice(0, -1).map(label).join(' ');
-  const last = label(cards[cards.length - 1]);
-
-  return (
-    <div className="flex justify-center mb-4">
-      <div className="text-xs text-cream-muted/80 text-center">
-        <div>
-          {player?.nickname || '?'} 出了:
-          {lastPlay.type === 'combo' && <span className="text-purple-300 ml-1">(连打{cards.length}张)</span>}
-        </div>
-        <div className="flex items-center justify-center gap-1 mt-0.5">
-          {rest && <span className="opacity-50">{rest}</span>}
-          <span className="text-gold-light font-bold border border-gold/30 rounded px-1">→ {last}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TurnTimer({ turnTimer, turnStartTime, isMyTurn }: { turnTimer?: number; turnStartTime?: number; isMyTurn: boolean }) {
-  const [remaining, setRemaining] = useState(turnTimer || 120);
-  useEffect(() => {
-    if (!turnStartTime) return;
-    const dur = turnTimer || 120;
-    const tick = () => setRemaining(Math.max(0, dur - Math.floor((Date.now() - turnStartTime) / 1000)));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [turnTimer, turnStartTime]);
-  return (
-    <span className={`text-xs font-mono ${isMyTurn ? 'text-gold-light font-bold' : 'text-cream-muted'}`}>
-      {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
-    </span>
-  );
-}
-
 function ColorDot({ color }: { color: string }) {
   const map: Record<string, string> = { red: 'bg-uno-red', yellow: 'bg-uno-yellow', green: 'bg-uno-green', blue: 'bg-uno-blue' };
   return <div className="flex justify-center"><div className={`w-4 h-4 rounded-full ${map[color] || 'bg-slate-600'} border border-white/20 shadow-sm`} /></div>;
 }
 
-function StatusHint({ isMyTurn, pendingDraw, hasPlayable, error }: { isMyTurn: boolean; pendingDraw: number; hasPlayable: boolean; error?: string }) {
-  if (error) return <div className="text-red-300 text-xs animate-pulse bg-red-900/30 px-3 py-1 rounded-full">{error}</div>;
-  if (!isMyTurn) return <div className="text-cream-muted/50 text-xs">等待其他玩家...</div>;
-  if (pendingDraw > 0) return <div className="text-red-300 text-xs font-bold animate-pulse">惩罚 +{pendingDraw} 张！跟牌或摸牌</div>;
-  if (!hasPlayable) return <div className="text-amber-300 text-xs">无牌可出 · 点击牌堆摸牌</div>;
-  return <div className="text-emerald-300 text-xs">你的回合 · 点击选牌</div>;
-}
-
-function ConnectionStatus() {
-  const [online, setOnline] = useState(navigator.onLine);
-  useEffect(() => {
-    const go = () => setOnline(navigator.onLine);
-    window.addEventListener('online', go);
-    window.addEventListener('offline', go);
-    return () => { window.removeEventListener('online', go); window.removeEventListener('offline', go); };
-  }, []);
-  return (
-    <div className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs ${
-      online ? 'bg-emerald-900/30 text-emerald-300' : 'bg-red-900/30 text-red-300 animate-pulse'
-    }`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-emerald-400' : 'bg-red-400'}`} />
-      {online ? '在线' : '离线'}
-    </div>
-  );
-}
-
-const EMOJI_LIST = ['🤡','💀','🐉','👁️','🫠','🤌','🗿','🍵','🥱','🙏','🫡','🤯','🪿','🎭','🦧','😭'];
+const EMOJI_LIST = ['😂','🤣','💀','🤡','😭','😈','👁️','🫠','🤌','🗿','🍵','🥱','🙏','🫡','🤯','🪿','🎭','🦧','🐉','💩','👻','🤖','👾','🎲'];
 
 function EmojiBar({ onSend }: { onSend: (emoji: string) => void }) {
   return (
-    <div className="flex justify-center gap-2 mt-2 flex-wrap">
-      {EMOJI_LIST.map(e => (
-        <button key={e} onClick={() => onSend(e)}
-          className="text-xl hover:scale-125 active:scale-90 transition-transform p-1"
-        >{e}</button>
-      ))}
+    <div className="flex-shrink-0 overflow-x-auto scrollbar-thin border-t border-gold/5 bg-felt-dark/60">
+      <div className="flex gap-1 px-2 py-1 min-w-max justify-center">
+        {EMOJI_LIST.map(e => (
+          <button key={e} onClick={() => onSend(e)}
+            className="text-lg hover:scale-125 active:scale-90 transition-transform flex-shrink-0 p-0.5"
+          >{e}</button>
+        ))}
+      </div>
     </div>
   );
 }
 
-function TurnHint({ isMyTurn, hasPlayableCards, pendingDraw }: {
-  isMyTurn: boolean;
-  hasPlayableCards: boolean;
-  pendingDraw: number;
-}) {
-  if (!isMyTurn) return (
-    <div className="text-cream-muted/50 text-xs sm:text-sm">等待其他玩家操作...</div>
-  );
-  if (pendingDraw > 0) return (
-    <div className="flex items-center gap-2 px-4 py-1.5 bg-red-900/30 border border-red-500/40 rounded-full">
-      <span className="text-red-300 text-xs sm:text-sm font-bold animate-pulse">惩罚 +{pendingDraw}张</span>
-      <span className="text-cream-muted/70 text-xs">{hasPlayableCards ? '跟牌回避 或 摸牌接受' : '点击牌堆摸牌'}</span>
-    </div>
-  );
-  if (!hasPlayableCards) return (
-    <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-900/20 border border-amber-500/30 rounded-full">
-      <span className="text-amber-300 text-xs sm:text-sm">无牌可出</span>
-      <span className="text-cream-muted/70 text-xs">点击牌堆摸牌</span>
-    </div>
-  );
-  return (
-    <div className="flex items-center gap-2 px-4 py-1.5 bg-emerald-900/20 border border-emerald-500/30 rounded-full">
-      <span className="text-emerald-300 text-xs sm:text-sm font-medium">你的回合</span>
-      <span className="text-cream-muted/50 text-xs">点击卡牌出牌 或 摸牌</span>
-    </div>
-  );
-}

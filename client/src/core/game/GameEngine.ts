@@ -19,13 +19,13 @@ export interface GameContext {
 }
 
 export interface AvailableAction {
-  type: 'play' | 'draw' | 'uno' | 'challenge' | 'skip';
+  type: 'play' | 'reverse' | 'draw' | 'uno' | 'challenge' | 'skip';
   cardId?: string;
   requiresColor?: boolean;
 }
 
 export interface GameAction {
-  type: 'play' | 'combo' | 'draw' | 'uno' | 'challenge' | 'jump';
+  type: 'play' | 'combo' | 'draw' | 'uno' | 'challenge' | 'jumpIn';
   payload: any;
 }
 
@@ -113,7 +113,7 @@ export class GameEngine {
   canPlayCard(cardId: string): boolean {
     if (!this.isMyTurn()) return false;
     return this.context.availableActions.some(
-      a => a.type === 'play' && a.cardId === cardId
+      a => (a.type === 'play' || a.type === 'reverse') && a.cardId === cardId
     );
   }
 
@@ -132,7 +132,7 @@ export class GameEngine {
 
   requiresColorSelection(cardId: string): boolean {
     const action = this.context.availableActions.find(
-      a => a.type === 'play' && a.cardId === cardId
+      a => (a.type === 'play' || a.type === 'reverse') && a.cardId === cardId
     );
     return action?.requiresColor || false;
   }

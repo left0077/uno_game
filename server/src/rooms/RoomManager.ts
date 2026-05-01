@@ -16,6 +16,9 @@ export class RoomManager {
   
   // 创建房间
   createRoom(hostId: string, hostNickname: string, settings?: Partial<RoomSettings>): Room {
+    // 先离开之前的房间（防止一个玩家同时存在于多个房间）
+    this.leaveRoom(hostId);
+
     const code = this.generateRoomCode();
     const room: Room = {
       id: uuidv4(),
@@ -57,7 +60,10 @@ export class RoomManager {
     if (room.status !== 'waiting') return null;
     if (room.players.length >= room.maxPlayers) return null;
     if (room.players.some(p => p.id === playerId)) return room;
-    
+
+    // 先离开之前的房间（防止一个玩家同时存在于多个房间）
+    this.leaveRoom(playerId);
+
     const player: Player = {
       id: playerId,
       nickname,
@@ -68,10 +74,10 @@ export class RoomManager {
       isConnected: true,
       isReady: false
     };
-    
+
     room.players.push(player);
     this.playerRoomMap.set(playerId, roomCode);
-    
+
     return room;
   }
   

@@ -124,21 +124,6 @@ export function useGameActions() {
     return true;
   }, [engine, gameService]);
 
-  /**
-   * 设置跳牌
-   * @param jump 是否跳牌
-   */
-  const setJump = useCallback((jump: boolean): void => {
-    gameService.setJump(jump);
-  }, [gameService]);
-
-  /**
-   * 投降
-   */
-  const surrender = useCallback((): void => {
-    gameService.executeAction({ type: 'jump', payload: { surrender: true } });
-  }, [gameService]);
-
   // 从服务端推送的可用动作中提取连打和惩罚信息
   const comboOptions = useMemo(() =>
     availableActions.filter(a => a.type === 'combo'),
@@ -156,8 +141,6 @@ export function useGameActions() {
     drawCard,
     callUno,
     challengePlayer,
-    setJump,
-    surrender,
 
     // 验证方法
     canPlay: engine.canPlayCard.bind(engine),

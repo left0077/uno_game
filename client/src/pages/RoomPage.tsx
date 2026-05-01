@@ -62,9 +62,9 @@ export function RoomPage({
   };
 
   return (
-    <div className="min-h-screen p-4 relative z-10">
+    <div className="min-h-screen p-2 sm:p-4 relative z-10">
       {/* 顶部导航 */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-3 sm:mb-6">
         <button
           onClick={onBack}
           className="px-4 py-2 casino-card text-gold hover:text-gold-light transition-all flex items-center gap-2"
@@ -94,7 +94,7 @@ export function RoomPage({
         </button>
       </div>
 
-      <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
         {/* 左侧：玩家列表 */}
         <div className="lg:col-span-2 space-y-4">
           <div className="casino-card p-6">
@@ -146,8 +146,8 @@ export function RoomPage({
               </div>
             )}
 
-            {/* 玩家列表 - 固定显示8个位置 */}
-            <div className="space-y-3">
+            {/* 玩家列表 - 固定显示8个位置，移动端超出滚动 */}
+            <div className="space-y-1.5 sm:space-y-3 lg:max-h-none max-h-[280px] overflow-y-auto">
               {Array.from({ length: 8 }).map((_, index) => {
                 const player = room.players[index];
                 return player ? (

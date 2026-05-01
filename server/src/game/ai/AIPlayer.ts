@@ -57,8 +57,10 @@ export class AIPlayer {
       let canPlay = false;
 
       if (hasPending) {
-        // 有累积惩罚时，只能出同类型 + 牌
-        canPlay = card.type === gameState.pendingDrawType;
+        // 有累积惩罚时，任意 + 牌都可以叠（与服务端 canStackCard 一致）
+        canPlay = card.type === 'draw2' || card.type === 'draw3' ||
+                  card.type === 'draw4' || card.type === 'draw5' ||
+                  card.type === 'draw8';
       } else if (card.type === 'wild' || card.type === 'draw4' || card.type === 'draw8') {
         // 万能牌总是可出
         canPlay = true;

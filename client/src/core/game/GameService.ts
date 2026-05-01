@@ -11,25 +11,12 @@ import { SocketClient, getSocketClient } from '../socket/SocketClient';
 import { GameEngine, getGameEngine, GameAction } from './GameEngine';
 import type { GameState, Card } from '../../../../shared/types';
 
-interface GameError {
-  code: string;
-  message: string;
-}
-
 export interface GameCallbacks {
   onGameStarted?: (data: { roomCode: string; mode: string; players: any[] }) => void;
   onGameState?: (state: GameState) => void;
   onMyHand?: (cards: Card[]) => void;
   onAvailableActions?: (actions: any[]) => void;
-  onTurnStarted?: (data: { playerId: string; deadline: number }) => void;
-  onGameError?: (error: GameError) => void;
   onGameEnded?: (result: any) => void;
-  onCardDrawn?: (data: { card: Card; playerId: string }) => void;
-  onCardPlayed?: (data: any) => void;
-  onUnoCalled?: (data: { playerId: string }) => void;
-  onChallengeResult?: (result: any) => void;
-  onPlayerSkipped?: (data: { playerId: string; reason: string }) => void;
-  onPenaltyApplied?: (data: any) => void;
   onChatMessage?: (msg: { type: string; content: string; playerId: string; playerName: string; timestamp: number }) => void;
   onGameEvent?: (data: any) => void;
 }
@@ -77,74 +64,10 @@ export class GameService {
       })
     );
 
-    // 监听回合开始
-    this.unsubscribeFns.push(
-      this.socket.on('game:turn', (data) => {
-        callbacks.onTurnStarted?.(data);
-      })
-    );
-
-    // 监听游戏错误
-    this.unsubscribeFns.push(
-      this.socket.on('game:error', (error) => {
-        console.error('[GameService] Game error:', error);
-        callbacks.onGameError?.(error);
-      })
-    );
-
     // 监听游戏结束
     this.unsubscribeFns.push(
       this.socket.on('game:ended', (result) => {
         callbacks.onGameEnded?.(result);
-      })
-    );
-
-    // 监听抽牌
-    this.unsubscribeFns.push(
-      this.socket.on('game:drawn', (data) => {
-        callbacks.onCardDrawn?.(data);
-      })
-    );
-
-    // 监听出牌
-    this.unsubscribeFns.push(
-      this.socket.on('game:played', (data) => {
-        callbacks.onCardPlayed?.(data);
-      })
-    );
-
-    // 监听 UNO 喊叫
-    this.unsubscribeFns.push(
-      this.socket.on('game:unoCalled', (data) => {
-        callbacks.onUnoCalled?.(data);
-      })
-    );
-
-    // 监听挑战结果
-    this.unsubscribeFns.push(
-      this.socket.on('game:challengeResult', (result) => {
-        callbacks.onChallengeResult?.(result);
-      })
-    );
-
-    // 监听玩家跳过
-    this.unsubscribeFns.push(
-      this.socket.on('game:playerSkipped', (data) => {
-        callbacks.onPlayerSkipped?.(data);
-      })
-    );
-
-    // 监听惩罚
-    this.unsubscribeFns.push(
-      this.socket.on('game:penalty', (data) => {
-        callbacks.onPenaltyApplied?.(data);
-      })
-    );
-
-    // 监听托管状态
-    this.unsubscribeFns.push(
-      this.socket.on('game:hostage', () => {
-        // 托管状态处理
       })
     );
 
@@ -176,9 +99,6 @@ export class GameService {
         break;
       case 'combo':
         this.playCombo(action.payload);
-        break;
-      case 'jump':
-        this.setJump(true);
         break;
       case 'jumpIn':
         this.jumpIn(action.payload.cardId);
@@ -246,25 +166,6 @@ export class GameService {
     const roomCode = this.getRoomCode();
     if (!roomCode) return;
     this.socket.emit('game:play', { roomCode, cardId });
-  }
-
-  setJump(jump: boolean): void {
-    const roomCode = this.getRoomCode();
-    if (!roomCode) {
-      console.warn('[GameService] No room code available');
-      return;
-    }
-    this.socket.emit('game:jump', { jump, roomCode });
-  }
-
-  // 超时处理
-  handleTimeout(): void {
-    const roomCode = this.getRoomCode();
-    if (!roomCode) {
-      console.warn('[GameService] No room code available');
-      return;
-    }
-    this.socket.emit('game:timeout', { roomCode });
   }
 
   sendEmoji(emoji: string): void {

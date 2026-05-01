@@ -154,32 +154,20 @@ export class SocketClient {
     this.socket.on('room:created', (data) => this.emitInternal('room:created', data));
     this.socket.on('room:joined', (data) => this.emitInternal('room:joined', data));
     this.socket.on('room:updated', (data) => this.emitInternal('room:updated', data));
-    this.socket.on('room:playerJoined', (data) => this.emitInternal('room:playerJoined', data));
-    this.socket.on('room:playerLeft', (data) => this.emitInternal('room:playerLeft', data));
 
     // 游戏事件
     this.socket.on('game:started', (data) => this.emitInternal('game:started', data));
     this.socket.on('game:state', (data) => this.emitInternal('game:state', data));
     this.socket.on('game:ended', (data) => this.emitInternal('game:ended', data));
-    
-    // 游戏事件（非状态同步，用于UI反馈）
     this.socket.on('game:event', (data) => this.emitInternal('game:event', data));
 
-    // 玩家个人事件
+    // 回合数据
     this.socket.on('player:turn', (data) => this.emitInternal('player:turn', data));
-    this.socket.on('player:hand', (data) => this.emitInternal('player:hand', data));
-    this.socket.on('player:actions', (data) => this.emitInternal('player:actions', data));
 
-    // V2 游戏事件
-    this.socket.on('v2:gameState', (data) => this.emitInternal('v2:gameState', data));
-    this.socket.on('v2:playerHand', (data) => this.emitInternal('v2:playerHand', data));
-    this.socket.on('v2:availableActions', (data) => this.emitInternal('v2:availableActions', data));
-    this.socket.on('v2:actionFailed', (data) => this.emitInternal('v2:actionFailed', data));
-
-    // 聊天事件
+    // 聊天
     this.socket.on('chat:message', (data) => this.emitInternal('chat:message', data));
 
-    // 错误事件
+    // 错误
     this.socket.on('error', (data) => this.emitInternal('error', data));
   }
 }

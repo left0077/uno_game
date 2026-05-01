@@ -11,6 +11,8 @@
 import { Card } from '../../shared/index.js';
 import { GameStateV2, GameActionV2, ValidationResult } from './types.js';
 import { BaseGameModeV2 } from './BaseGameModeV2.js';
+import { CardManager } from '../Card.js';
+import { GAME_MODES } from '../../config/gameConfig.js';
 
 export interface OutState {
   phase: 0 | 1 | 2 | 3;
@@ -46,11 +48,6 @@ export class OutModeV2 extends BaseGameModeV2 {
     }
     if (!comboType) {
       return { valid: false, error: '需要指定连打类型' };
-    }
-
-    // 有累积惩罚时不能连打（只能跟+或反转）
-    if (this.state.pendingDraw && this.state.pendingDraw > 0) {
-      return { valid: false, error: '惩罚中不能连打，请跟+或反转' };
     }
 
     const player = this.state.players.get(playerId);
@@ -235,6 +232,139 @@ export class OutModeV2 extends BaseGameModeV2 {
     // 阶段推进后检查所有在场玩家是否超限
     for (const playerId of [...this.state.tablePlayerIds]) {
       this.checkHandLimit(playerId);
+    }
+  }
+
+  // ============================================================================
+  // 可用动作扩展（连打检测）
+  // ============================================================================
+
+  protected getModeSpecificActions(
+    player: any,
+    _isCurrentTurn: boolean,
+    _hasPending: boolean,
+    actions: any[]
+  ): void {
+    // 惩罚期间也可以连打——连打出牌人不受惩罚，惩罚继续传给下家
+    const combos = OutModeV2.detectCombos(player.cards as Card[]);
+    for (const combo of combos) {
+      actions.push({
+        type: 'combo',
+        comboType: combo.type,
+        cardIds: combo.cardIds,
+        label: combo.label,
+      });
+    }
+  }
+
+  /**
+   * 连打检测（服务端权威）
+   * 检测对子/三条/炸弹/核弹/彩虹/顺子
+   */
+  static detectCombos(cards: Card[]): Array<{ type: string; cardIds: string[]; label: string }> {
+    const results: Array<{ type: string; cardIds: string[]; label: string }> = [];
+    const normal = cards.filter(c => c.type !== 'wild' && c.type !== 'draw4' && c.type !== 'draw8');
+    if (normal.length < 2) return results;
+
+    // 按颜色和数值分组
+    const byColor = new Map<string, Card[]>();
+    const byValue = new Map<number, Card[]>();
+    for (const c of normal) {
+      if (!byColor.has(c.color)) byColor.set(c.color, []);
+      byColor.get(c.color)!.push(c);
+      const v = Number(c.value);
+      if (!isNaN(v)) {
+        if (!byValue.has(v)) byValue.set(v, []);
+        byValue.get(v)!.push(c);
+      }
+    }
+
+    // 对子/三条/炸弹/核弹（同数字，颜色任意）
+    for (const [, cs] of byValue) {
+      if (cs.length >= 2) {
+        results.push({ type: 'pair', cardIds: [cs[0].id, cs[1].id], label: `对子${cs[0].value}` });
+        if (cs.length >= 3) {
+          results.push({ type: 'pair', cardIds: [cs[1].id, cs[2].id], label: `对子${cs[0].value}` });
+          results.push({ type: 'three', cardIds: cs.slice(0, 3).map(c => c.id), label: `三条${cs[0].value}` });
+        }
+        if (cs.length >= 4) {
+          results.push({ type: 'pair', cardIds: [cs[2].id, cs[3].id], label: `对子${cs[0].value}` });
+          results.push({ type: 'three', cardIds: cs.slice(0, 4).map(c => c.id), label: `💣炸弹${cs[0].value}` });
+        }
+        if (cs.length >= 5) {
+          results.push({ type: 'three', cardIds: cs.slice(0, 5).map(c => c.id), label: `☢️核弹${cs[0].value}` });
+        }
+      }
+    }
+
+    // 彩虹（四色同值）
+    for (const [, cs] of byValue) {
+      if (cs.length >= 4) {
+        const colors = new Set(cs.map(c => c.color));
+        if (colors.size >= 4) {
+          const picked: Card[] = [];
+          const used = new Set<string>();
+          for (const c of cs) {
+            if (!used.has(c.color)) { picked.push(c); used.add(c.color); }
+          }
+          if (picked.length >= 4) {
+            results.push({ type: 'rainbow', cardIds: picked.slice(0, 4).map(c => c.id), label: `彩虹${picked[0].value}` });
+          }
+        }
+      }
+    }
+
+    // 顺子（同色3+连续数字，去重）
+    for (const [, cs] of byColor) {
+      if (cs.length < 3) continue;
+      const nums = cs
+        .map(c => ({ id: c.id, v: Number(c.value) }))
+        .filter(x => !isNaN(x.v))
+        .sort((a, b) => a.v - b.v);
+      const deduped = nums.filter((n, i) => i === 0 || n.v !== nums[i - 1].v);
+      if (deduped.length < 3) continue;
+      let start = 0;
+      for (let i = 1; i <= deduped.length; i++) {
+        if (i < deduped.length && deduped[i].v === deduped[i - 1].v + 1) continue;
+        if (i - start >= 3) {
+          results.push({
+            type: 'straight',
+            cardIds: deduped.slice(start, i).map(x => x.id),
+            label: `顺子${deduped[start].v}-${deduped[i - 1].v}`,
+          });
+        }
+        start = i;
+      }
+    }
+
+    return results;
+  }
+
+  // ============================================================================
+  // 阶段钩子（覆盖基类）
+  // ============================================================================
+
+  protected getPhaseSeconds(): number[] {
+    return GAME_MODES.out.phases.map(p => p.at);
+  }
+
+  protected getGlobalTimeout(): number {
+    return GAME_MODES.out.globalTimeout;
+  }
+
+  protected onPhaseAdvance(phase: number): void {
+    this.advancePhase(phase);
+
+    // 注入惩罚卡
+    const phaseCfg = GAME_MODES.out.phases[phase];
+    if (phaseCfg) {
+      for (const [cardType, count] of Object.entries(phaseCfg.injectCards)) {
+        this.state.deck = CardManager.injectPenaltyCards(
+          this.state.deck,
+          cardType as 'draw3' | 'draw5' | 'draw8',
+          count,
+        );
+      }
     }
   }
 }

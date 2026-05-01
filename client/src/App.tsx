@@ -65,11 +65,13 @@ function App() {
   // 页面切换处理器
   const handleRoomCreated = useCallback((room: Room) => {
     store.setRoom(room);
+    sessionStorage.setItem('uno-reconnect-room', room.code);
     handlePageChange('room');
   }, [store, handlePageChange]);
 
   const handleRoomJoined = useCallback((room: Room) => {
     store.setRoom(room);
+    sessionStorage.setItem('uno-reconnect-room', room.code);
     handlePageChange('room');
   }, [store, handlePageChange]);
 
@@ -79,6 +81,7 @@ function App() {
   }, [handlePageChange]);
 
   const handleLeaveRoom = useCallback(() => {
+    sessionStorage.removeItem('uno-reconnect-room');
     handlePageChange('home');
     setGameStarted(false);
     store.resetRoomState();
@@ -96,7 +99,13 @@ function App() {
 
   const handleRoomUpdated = useCallback((room: Room) => {
     store.setRoom(room);
-  }, [store]);
+    // 刷新后重连：如果房间在游戏中，自动跳回游戏页
+    if (room.status === 'playing' && page === 'home') {
+      store.setGameResult(null);
+      setGameStarted(true);
+      handlePageChange('game');
+    }
+  }, [store, page, handlePageChange]);
 
   const handleError = useCallback((error: { code: string; message: string }) => {
     store.setError(error.message);

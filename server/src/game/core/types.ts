@@ -75,6 +75,27 @@ export interface GameStateV2 {
   /** 惩罚来源玩家 ID（反转弹回用） */
   penaltySourceId?: string;
 
+  /** 每个玩家最近一次动作的效果摘要（用于客户端显示） */
+  playerLastActions?: Map<string, {
+    type: string;
+    label: string;
+    cardCount: number;
+    cards: any[];
+    effect: string;
+    timestamp: number;
+  }>;
+
+  /** 回合动作日志（按时间顺序，保留最近30条） */
+  turnLog?: Array<{
+    playerId: string;
+    nickname: string;
+    type: string;
+    label: string;
+    cards: any[];
+    effect: string;
+    timestamp: number;
+  }>;
+
   // === Out模式特有 ===
   outState?: {
     phase: 0 | 1 | 2 | 3;

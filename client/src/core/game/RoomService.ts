@@ -66,20 +66,6 @@ export class RoomService {
       })
     );
 
-    // 监听玩家加入
-    this.unsubscribeFns.push(
-      this.socket.on('room:playerJoined', (player) => {
-        console.log('[RoomService] Player joined:', player.nickname);
-      })
-    );
-
-    // 监听玩家离开
-    this.unsubscribeFns.push(
-      this.socket.on('room:playerLeft', (data) => {
-        console.log('[RoomService] Player left:', data.playerId);
-      })
-    );
-
     // 监听错误
     this.unsubscribeFns.push(
       this.socket.on('error', (error) => {
@@ -98,10 +84,18 @@ export class RoomService {
   // ========== 房间操作 ==========
 
   createRoom(nickname: string): void {
+    // 先离开旧房间，避免同时存在于多个房间
+    if (this.engine.getContext().room) {
+      this.leaveRoom();
+    }
     this.socket.emit('room:create', { nickname });
   }
 
   joinRoom(roomCode: string, nickname: string): void {
+    // 先离开旧房间，避免同时存在于多个房间
+    if (this.engine.getContext().room) {
+      this.leaveRoom();
+    }
     this.socket.emit('room:join', { roomCode, nickname });
   }
 
