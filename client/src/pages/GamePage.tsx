@@ -171,45 +171,62 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
 
   return (
     <div className="h-dvh bg-casino flex flex-col relative z-10 overflow-hidden">
+      {/* 桌面聚光灯效果 */}
+      <div className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at 50% 38%, rgba(234,179,8,0.035) 0%, transparent 55%)' }} />
+
       {/* ====== 顶栏 ====== */}
-      <div className="flex items-center justify-between px-2 py-1 casino-card mx-1 mt-1 flex-shrink-0 h-[36px]">
-        <div className="w-[60px] flex items-center"><NetworkDot /></div>
-        <div className="flex items-center gap-2">
-          <span className="text-gold font-bold text-base">{gameState.direction === 'counterclockwise' || gameState.direction === -1 ? '←' : '→'}</span>
+      <div className="flex items-center justify-between px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl bg-felt-dark/50 border border-gold/10 backdrop-blur-sm mx-2 sm:mx-4 mt-2 sm:mt-3 flex-shrink-0 h-[36px] sm:h-[44px] shadow-lg shadow-black/20">
+        <div className="w-[60px] sm:w-[80px] flex items-center gap-1.5 sm:gap-2">
+          <NetworkDot />
+          <span className="text-cream-muted/40 text-[10px] sm:text-xs font-medium">{allPlayers.length}人</span>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-gold font-bold text-sm sm:text-base">{gameState.direction === 'counterclockwise' || gameState.direction === -1 ? '←' : '→'}</span>
           {isOut && gameState.gameStartTime ? (
             <PhaseTimer gameStartTime={gameState.gameStartTime} phaseTimes={(gameState as any).phaseTimes || [180, 360, 540]} currentPhase={gameState.outState.phase} maxCards={gameState.outState.maxCards} turnTimer={gameState.turnTimer} turnStartTime={gameState.turnStartTime} isMyTurn={isMyTurn} />
           ) : (
-            <span className="text-cream-muted/60 text-xs">{isMyTurn ? '你的回合' : '等待中'}</span>
+            <span className={`text-xs sm:text-sm font-medium ${isMyTurn ? 'text-gold' : 'text-cream-muted/50'}`}>{isMyTurn ? '你的回合' : '等待中'}</span>
           )}
         </div>
-        <div className="w-[60px] flex justify-end">
-          <button onClick={() => setShowRules(true)} className="w-7 h-7 text-xs rounded-full bg-felt-dark/60 border border-gold/30 text-gold-light flex items-center justify-center">?</button>
+        <div className="w-[60px] sm:w-[80px] flex justify-end">
+          <button onClick={() => setShowRules(true)} className="w-7 h-7 sm:w-8 sm:h-8 text-xs sm:text-sm rounded-full bg-felt-dark/80 border border-gold/20 text-gold-light flex items-center justify-center hover:bg-gold/10 hover:border-gold/40 transition-all">?</button>
         </div>
       </div>
 
       {/* ====== 上排对手 ====== */}
-      <PlayerRow players={topRow} currentPlayerId={gameState.currentPlayerId} penaltyStats={ps} playerLastPlays={pp} playerEmojis={pe} onChallenge={onChallenge} />
+      <div className="flex-shrink-0 py-1 sm:py-2">
+        <PlayerRow players={topRow} currentPlayerId={gameState.currentPlayerId} penaltyStats={ps} playerLastPlays={pp} playerEmojis={pe} onChallenge={onChallenge} />
+      </div>
 
       {/* ====== 中央：左 | 弃牌+日志 | 右 ====== */}
-      <div className="flex-1 flex gap-1 px-1 min-h-0 py-0.5">
+      <div className="flex-1 flex gap-1 sm:gap-2 px-1 sm:px-2 min-h-0 py-0.5 sm:py-1">
         <PlayerCol players={leftCol} currentPlayerId={gameState.currentPlayerId} penaltyStats={ps} playerLastPlays={pp} playerEmojis={pe} onChallenge={onChallenge} />
 
-        <div className="flex-1 flex flex-col gap-1 min-w-0">
-          <div className="flex-1 flex gap-1 min-h-0">
-            {/* 弃牌堆 */}
-            <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="relative">
-                <DiscardPile topCard={gameState.topCard} />
-                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5">
+        <div className="flex-1 flex flex-col gap-1 sm:gap-2 min-w-0">
+          {/* 移动端：弃牌堆+日志上下排；PC端：左右排 */}
+          <div className="flex-1 flex flex-col sm:flex-row gap-2 sm:gap-3 min-h-0">
+            {/* 弃牌堆 — 桌面中心焦点 */}
+            <div className="flex-[2] flex flex-col items-center justify-center">
+              <div className="relative flex items-center justify-center">
+                {/* 桌垫光环 */}
+                <div className="absolute w-[140px] h-[100px] sm:w-[200px] sm:h-[140px] md:w-[240px] md:h-[170px] rounded-full bg-felt-dark/40 border border-gold/5 pointer-events-none"
+                  style={{ transform: 'scaleX(1.2)' }} />
+                <div className="absolute w-[100px] h-[70px] sm:w-[140px] sm:h-[100px] md:w-[170px] md:h-[120px] rounded-full bg-gold/[0.03] pointer-events-none"
+                  style={{ transform: 'scaleX(1.2)' }} />
+                <div className="relative z-10">
+                  <DiscardPile topCard={gameState.topCard} />
+                </div>
+                <div className="absolute -bottom-6 sm:-bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-20">
                   <ColorDot color={gameState.currentColor} />
                   {pendingDraw > 0 && (
-                    <div className="text-red-400 font-bold text-[10px] bg-felt-dark/80 px-1 rounded-full animate-pulse whitespace-nowrap">+{pendingDraw}</div>
+                    <div className="text-red-400 font-bold text-[10px] sm:text-xs bg-felt-dark/90 border border-red-500/30 px-2 py-0.5 rounded-full animate-pulse whitespace-nowrap shadow-lg">+{pendingDraw}</div>
                   )}
                 </div>
               </div>
             </div>
-            {/* 日志：和弃牌等高 */}
-            <div className="flex-1 min-w-0">
+            {/* 日志：移动端固定高度，PC端自适应 */}
+            <div className="h-16 sm:h-auto sm:flex-1 min-w-0">
               <TurnLog entries={(gameState as any).turnLog || []} emojiMessages={emojiMessages || []} players={allPlayers} />
             </div>
           </div>
@@ -229,43 +246,46 @@ export function GamePage({ gameActions, onLeaveRoom, emojiMessages, onDismissEmo
         <PlayerCol players={rightCol} currentPlayerId={gameState.currentPlayerId} penaltyStats={ps} playerLastPlays={pp} playerEmojis={pe} onChallenge={onChallenge} />
       </div>
 
-      {/* ====== 操作按钮 ====== */}
-      <div className="flex-shrink-0 px-2 pb-1">
-        <div className="flex gap-2 max-w-xs mx-auto">
+      {/* ====== 底部控制面板 ====== */}
+      <div className="flex-shrink-0 bg-felt-dark/40 border-t border-gold/5 backdrop-blur-sm">
+        {/* 操作按钮 */}
+        <div className="px-3 sm:px-4 pb-2 pt-2 sm:pt-3">
+          <div className="flex gap-2 sm:gap-3 max-w-xs sm:max-w-sm mx-auto">
           {selectedCards.length > 0 && isMyTurn && (selectedCards.length === 1 || activeCombo) ? (
             <>
-              <button onClick={() => setSelectedCards([])} className="flex-1 h-10 bg-felt-dark/60 border border-gold/20 text-cream-muted rounded-xl text-sm">取消</button>
-              <button onClick={handleConfirmPlay} className="flex-[2] h-10 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl shadow-lg active:scale-95 text-sm">{activeCombo ? activeCombo.label : '出牌'}</button>
+              <button onClick={() => setSelectedCards([])} className="flex-1 h-11 sm:h-12 bg-felt-dark/60 border border-gold/20 text-cream-muted rounded-xl text-sm sm:text-base active:scale-95 transition-transform">取消</button>
+              <button onClick={handleConfirmPlay} className="flex-[2] h-11 sm:h-12 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl shadow-lg active:scale-95 text-sm sm:text-base">{activeCombo ? activeCombo.label : '出牌'}</button>
             </>
           ) : selectedCards.length > 1 && !activeCombo && isMyTurn ? (
-            <button onClick={() => setSelectedCards([])} className="flex-1 h-10 bg-amber-900/40 border border-amber-500/30 text-amber-300 rounded-xl text-sm">{selectedCards.length}张未成连打·取消</button>
+            <button onClick={() => setSelectedCards([])} className="flex-1 h-11 sm:h-12 bg-amber-900/40 border border-amber-500/30 text-amber-300 rounded-xl text-sm sm:text-base active:scale-95 transition-transform">{selectedCards.length}张未成连打·取消</button>
           ) : (
             <>
-              <button onClick={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} className="flex-1 h-10 btn-soft-blue text-sm rounded-xl disabled:opacity-40 font-medium">摸牌</button>
-              <button onClick={handleClickUno} disabled={!canUno || !!myUnoCalled || unoClicked} className={`flex-1 h-10 text-sm rounded-xl font-bold transition-all ${
+              <button onClick={handleDrawCard} disabled={!isMyTurn || !gameActions.canDraw()} className="flex-1 h-11 sm:h-12 btn-soft-blue text-sm sm:text-base rounded-xl disabled:opacity-40 font-medium active:scale-95 transition-transform">摸牌</button>
+              <button onClick={handleClickUno} disabled={!canUno || !!myUnoCalled || unoClicked} className={`flex-1 h-11 sm:h-12 text-sm sm:text-base rounded-xl font-bold transition-all active:scale-95 ${
                 myUnoCalled ? 'bg-emerald-700 text-white border border-emerald-400' :
                 unoClicked ? 'bg-yellow-500 text-black scale-95' :
                 canUno ? 'btn-soft-red animate-pulse' : 'bg-felt-dark/60 text-cream-muted/40 cursor-not-allowed'
               }`}>{myUnoCalled ? 'UNO ✓' : unoClicked ? '已喊!' : 'UNO!'}</button>
             </>
           )}
+          </div>
         </div>
-      </div>
 
-      {/* ====== 手牌 ====== */}
-      <div className="flex-shrink-0 pb-1">
-        <MyHand
-          cards={gameActions.myHand}
-          isMyTurn={isMyTurn}
-          selectedCards={selectedCards}
-          comboCards={comboCards}
-          onCardClick={handleCardClick}
-          canPlay={gameActions.canPlay}
-        />
-      </div>
+        {/* 手牌 */}
+        <div className="pb-1 sm:pb-2">
+          <MyHand
+            cards={gameActions.myHand}
+            isMyTurn={isMyTurn}
+            selectedCards={selectedCards}
+            comboCards={comboCards}
+            onCardClick={handleCardClick}
+            canPlay={gameActions.canPlay}
+          />
+        </div>
 
-      {/* ====== 表情栏 ====== */}
-      <EmojiBar onSend={gameActions.sendEmoji} />
+        {/* 表情栏 */}
+        <EmojiBar onSend={gameActions.sendEmoji} />
+      </div>
 
       {/* 弹窗 */}
       {showColorPicker && <ColorPickerModal onSelect={handleColorSelect} onCancel={() => setShowColorPicker(false)} />}
@@ -299,22 +319,35 @@ function TurnLog({ entries, emojiMessages, players }: {
 
   useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [timeline.length]);
 
-  if (!timeline.length) return <div className="h-full flex items-center justify-center text-cream-muted/20 text-[10px]">回合记录</div>;
+  if (!timeline.length) return (
+    <div className="h-full flex flex-col items-center justify-center gap-1 text-cream-muted/25">
+      <span className="text-lg">📝</span>
+      <span className="text-[10px] sm:text-xs">回合记录</span>
+    </div>
+  );
+
   return (
-    <div ref={ref} className="h-full overflow-y-auto scrollbar-thin text-[10px] leading-relaxed">
+    <div ref={ref} className="h-full overflow-y-auto scrollbar-thin text-[10px] sm:text-xs leading-relaxed py-1">
       {timeline.slice(-30).map((e, i) => (
-        <div key={i} className="px-1 py-0.5 border-b border-gold/5 last:border-0">
+        <div key={i} className="relative pl-3 sm:pl-4 pr-1 py-1 sm:py-1.5">
+          {/* 时间线 */}
+          <div className="absolute left-1 sm:left-1.5 top-0 bottom-0 w-px bg-gradient-to-b from-gold/20 via-gold/10 to-transparent" />
+          <div className={`absolute left-0.5 sm:left-1 top-2 w-1 h-1 rounded-full ${e.kind === 'emoji' ? 'bg-purple-400/50' : 'bg-gold/40'}`} />
+
           {e.kind === 'emoji' ? (
-            <span><span className="text-cream-muted/40">{e.nickname}</span> <span className="text-sm">{e.emoji}</span></span>
+            <div className="flex items-center gap-1">
+              <span className="text-cream-muted/40 truncate">{e.nickname}</span>
+              <span className="text-sm sm:text-base">{e.emoji}</span>
+            </div>
           ) : (
-            <span>
+            <div className="text-cream-muted/60">
               <span className="text-cream-muted/40">{e.nickname}</span>
               {e.cards?.length > 0 && e.cards.slice(0, 3).map((c: any, j: number) => (
                 <span key={j} className={c?.color==='red'?'text-red-400':c?.color==='yellow'?'text-yellow-300':c?.color==='green'?'text-green-400':c?.color==='blue'?'text-blue-400':''}> {c?.type==='skip'?'🚫':c?.type==='reverse'?'🔄':c?.type?.startsWith('draw')?`+${c.type.replace('draw','')}`:c?.type==='wild'?'🌈':c?.value??'?'}</span>
               ))}
-              {e.label && <span className="text-purple-300/70"> {e.label}</span>}
+              {e.label && <span className="text-purple-300/80"> {e.label}</span>}
               {e.effect && <span className="text-cream-muted/50"> {e.effect}</span>}
-            </span>
+            </div>
           )}
         </div>
       ))}
@@ -329,7 +362,12 @@ function NetworkDot() {
     window.addEventListener('online', go); window.addEventListener('offline', go);
     return () => { window.removeEventListener('online', go); window.removeEventListener('offline', go); };
   }, []);
-  return <span className={`w-2 h-2 rounded-full ${on ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'}`} title={on ? '在线' : '离线'} />;
+  return (
+    <span className={`relative flex h-2 w-2 sm:h-2.5 sm:w-2.5`}>
+      {on && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-40" />}
+      <span className={`relative inline-flex rounded-full h-full w-full ${on ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]' : 'bg-red-400 animate-pulse'}`} title={on ? '在线' : '离线'} />
+    </span>
+  );
 }
 
 function actionEmoji(lastPlay: any): string {
@@ -354,23 +392,63 @@ function PlayerBlock({ player, isCurrent, penalty, lastPlay, emoji }: {
   if (!player) return null;
   const isFinished = player.status === 'finished';
   const act = actionEmoji(lastPlay);
+
+  // 收集状态徽章，最多显示3个
+  const badges: { emoji: string; color?: string }[] = [];
+  if (player.hasCalledUno) badges.push({ emoji: '🚨', color: 'text-red-400' });
+  if (penalty > 0) badges.push({ emoji: `😭${penalty}`, color: 'text-red-400/80' });
+  if (act) badges.push({ emoji: act });
+  if (emoji) badges.push({ emoji });
+
+  // 首字母作为头像占位
+  const initial = player.nickname?.charAt(0)?.toUpperCase() || '?';
+
   return (
-    <div className={`w-[55px] text-center px-0.5 py-0.5 rounded border ${
-      isCurrent ? 'bg-gold/20 border-gold/50' :
-      isFinished ? 'bg-emerald-900/30 border-emerald-500/40' :
-      player.eliminated ? 'bg-red-900/20 border-red-500/30 opacity-50' :
-      'bg-felt-dark/40 border-gold/5'
+    <div className={`w-[55px] sm:w-[72px] md:w-[80px] h-[62px] sm:h-[82px] flex flex-col items-center relative rounded-xl border transition-all overflow-hidden ${
+      isCurrent ? 'bg-gold/10 border-gold/40 shadow-[0_0_16px_rgba(234,179,8,0.12)]' :
+      isFinished ? 'bg-emerald-900/25 border-emerald-500/30' :
+      player.eliminated ? 'bg-red-900/15 border-red-500/20 opacity-50' :
+      'bg-felt-dark/50 border-white/5'
     }`}>
-      <div className="flex items-center justify-center gap-0.5">
-        {isCurrent && <span className="w-1 h-1 bg-gold rounded-full flex-shrink-0" />}
-        <span className={`text-[10px] font-medium truncate ${isCurrent ? 'text-gold-light' : 'text-cream-muted/80'}`}>{player.nickname}</span>
+      {/* 当前玩家顶部金色光条 */}
+      {isCurrent && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 sm:w-10 h-0.5 bg-gradient-to-r from-transparent via-gold to-transparent rounded-full" />}
+
+      {/* 昵称行 */}
+      <div className="mt-1 sm:mt-1.5 flex items-center justify-center gap-0.5 w-full px-1">
+        {isCurrent && <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-gold rounded-full flex-shrink-0 animate-pulse" />}
+        <span className={`text-[10px] sm:text-xs font-medium truncate ${isCurrent ? 'text-gold-light' : 'text-cream-muted/70'}`}>
+          {player.nickname}
+        </span>
       </div>
-      <div className="text-[9px] text-cream-muted/50 leading-tight flex items-center justify-center gap-0.5 flex-wrap">
-        {isFinished ? '🏆' : player.eliminated ? '💀' : <>{player.cardCount ?? 0}张</>}
-        {player.hasCalledUno && <span className="text-red-400 font-bold">UNO</span>}
-        {penalty > 0 && <span className="text-red-400/70">😭{penalty}</span>}
-        {act && <span>{act}</span>}
-        {emoji && <span className="text-[11px] leading-none">{emoji}</span>}
+
+      {/* 首字母头像 + 手牌数 */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className={`relative w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center ${
+          isCurrent ? 'bg-gold/15 text-gold' :
+          isFinished ? 'bg-emerald-500/15 text-emerald-400' :
+          player.eliminated ? 'bg-red-500/10 text-red-400' :
+          'bg-white/5 text-cream-muted/60'
+        }`}>
+          <span className="text-xs sm:text-sm font-bold">
+            {isFinished ? '🏆' : player.eliminated ? '💀' : initial}
+          </span>
+          {/* 手牌数小徽章 */}
+          {!isFinished && !player.eliminated && (
+            <span className={`absolute -bottom-0.5 -right-0.5 min-w-[14px] sm:min-w-[16px] h-3.5 sm:h-4 px-0.5 rounded-full flex items-center justify-center text-[8px] sm:text-[10px] font-bold border border-casino ${
+              isCurrent ? 'bg-gold text-black' : 'bg-felt-dark text-cream-muted/80'
+            }`}>
+              {player.cardCount ?? 0}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 徽章行 */}
+      <div className="h-3 sm:h-4 flex items-center justify-center gap-0.5 mb-1 flex-shrink-0">
+        {badges.slice(0, 3).map((b, i) => (
+          <span key={i} className={`text-[10px] sm:text-xs leading-none ${b.color || 'text-cream-muted/50'}`}>{b.emoji}</span>
+        ))}
+        {badges.length > 3 && <span className="text-[8px] text-cream-muted/40 leading-none">+</span>}
       </div>
     </div>
   );
@@ -379,10 +457,10 @@ function PlayerBlock({ player, isCurrent, penalty, lastPlay, emoji }: {
 function PlayerRow({ players, currentPlayerId, penaltyStats, playerLastPlays, playerEmojis, onChallenge }: any) {
   if (!players.length) return null;
   return (
-    <div className="flex justify-center gap-0.5 px-1 flex-shrink-0">
+    <div className="flex justify-center gap-0.5 sm:gap-2 px-1 sm:px-2 flex-shrink-0">
       {players.map((p: any) => (
         <div key={p.id} onClick={p.cardCount === 1 && !p.hasCalledUno && p.id !== currentPlayerId ? () => onChallenge(p.id) : undefined}
-          className={p.cardCount === 1 && !p.hasCalledUno && p.id !== currentPlayerId ? 'cursor-pointer rounded border border-yellow-400/60' : ''}>
+          className={p.cardCount === 1 && !p.hasCalledUno && p.id !== currentPlayerId ? 'cursor-pointer rounded-lg border border-yellow-400/60' : ''}>
           <PlayerBlock player={p} isCurrent={p.id === currentPlayerId} penalty={penaltyStats[p.id] || 0} lastPlay={playerLastPlays[p.id]} emoji={playerEmojis[p.id]} />
         </div>
       ))}
@@ -391,12 +469,12 @@ function PlayerRow({ players, currentPlayerId, penaltyStats, playerLastPlays, pl
 }
 
 function PlayerCol({ players, currentPlayerId, penaltyStats, playerLastPlays, playerEmojis, onChallenge }: any) {
-  if (!players.length) return <div className="flex-shrink-0 w-[55px]" />;
+  if (!players.length) return <div className="flex-shrink-0 w-[55px] sm:w-[72px] md:w-[80px]" />;
   return (
-    <div className="flex flex-col justify-center gap-0.5 flex-shrink-0 w-[55px]">
+    <div className="flex flex-col justify-center gap-0.5 sm:gap-2 flex-shrink-0 w-[55px] sm:w-[72px] md:w-[80px]">
       {players.map((p: any) => (
         <div key={p.id} onClick={p.cardCount === 1 && !p.hasCalledUno && p.id !== currentPlayerId ? () => onChallenge(p.id) : undefined}
-          className={p.cardCount === 1 && !p.hasCalledUno && p.id !== currentPlayerId ? 'cursor-pointer rounded border border-yellow-400/60' : ''}>
+          className={p.cardCount === 1 && !p.hasCalledUno && p.id !== currentPlayerId ? 'cursor-pointer rounded-lg border border-yellow-400/60' : ''}>
           <PlayerBlock player={p} isCurrent={p.id === currentPlayerId} penalty={penaltyStats[p.id] || 0} lastPlay={playerLastPlays[p.id]} emoji={playerEmojis[p.id]} />
         </div>
       ))}
@@ -406,12 +484,12 @@ function PlayerCol({ players, currentPlayerId, penaltyStats, playerLastPlays, pl
 
 function DiscardPile({ topCard }: { topCard?: CardType }) {
   return (
-    <div className="w-[72px] h-[100px] flex items-center justify-center">
+    <div className="w-[72px] h-[100px] sm:w-[100px] sm:h-[140px] md:w-[120px] md:h-[168px] flex items-center justify-center">
       {topCard ? (
-        <Card card={topCard} size="md" disabled />
+        <Card card={topCard} size="lg" disabled />
       ) : (
         <div className="w-full h-full bg-felt-dark/80 rounded-xl border-2 border-gold/20 flex items-center justify-center">
-          <span className="text-gold/40 text-xl">🃏</span>
+          <span className="text-gold/40 text-xl sm:text-3xl">🃏</span>
         </div>
       )}
     </div>
@@ -445,8 +523,11 @@ function MyHand({
     return va - vb;
   });
 
+  // 响应式重叠：移动端重叠多，PC端展开
+  const overlapClass = cards.length > 12 ? '-mx-2 sm:-mx-1' : cards.length > 8 ? '-mx-1 sm:-mx-0.5' : 'sm:mx-0.5';
+
   return (
-    <div className="flex justify-center items-end gap-0.5 px-2 overflow-x-auto">
+    <div className="flex justify-center items-end gap-0 px-2 sm:px-4 overflow-x-auto scrollbar-thin pb-1">
       {sorted.map((card, idx) => {
         const playable = isMyTurn && canPlay(card.id);
         const isCombo = comboCards.has(card.id);
@@ -455,22 +536,25 @@ function MyHand({
         const selIndex = selectedCards.indexOf(card.id);
         const isLastSelected = isSelected && selIndex === selectedCards.length - 1;
 
+        // 响应式尺寸：PC 端牌更大
+        const cardSize = cards.length > 10 ? 'sm' : cards.length > 5 ? 'md' : 'md';
+
         return (
           <div
             key={card.id}
-            className="relative flex-shrink-0 -mx-1 sm:-mx-0.5 first:ml-0 last:mr-0"
+            className={`relative flex-shrink-0 ${overlapClass} first:ml-0 last:mr-0`}
             style={{ zIndex: isSelectable ? 10 + idx : idx }}
           >
             {/* 选中序号 + 尾牌标识 */}
             {isSelected && selectedCards.length > 1 && (
-              <div className={`absolute -top-2 left-1/2 -translate-x-1/2 z-30 px-1.5 py-0.5 rounded-full text-[10px] font-bold
+              <div className={`absolute -top-2 sm:-top-3 left-1/2 -translate-x-1/2 z-30 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold shadow-lg
                 ${isLastSelected ? 'bg-gold text-black' : 'bg-white/20 text-white'}`}>
                 {isLastSelected ? '→尾' : selIndex + 1}
               </div>
             )}
             <Card
               card={card}
-              size={cards.length > 10 ? 'sm' : 'md'}
+              size={cardSize}
               isPlayable={playable && !isCombo}
               isComboPart={isCombo && !playable}
               isSelected={isSelected}
@@ -602,19 +686,19 @@ function ColorPickerModal({
 }
 
 function ColorDot({ color }: { color: string }) {
-  const map: Record<string, string> = { red: 'bg-uno-red', yellow: 'bg-uno-yellow', green: 'bg-uno-green', blue: 'bg-uno-blue' };
-  return <div className="flex justify-center"><div className={`w-4 h-4 rounded-full ${map[color] || 'bg-slate-600'} border border-white/20 shadow-sm`} /></div>;
+  const map: Record<string, string> = { red: 'bg-uno-red shadow-red-500/50', yellow: 'bg-uno-yellow shadow-yellow-500/50', green: 'bg-uno-green shadow-green-500/50', blue: 'bg-uno-blue shadow-blue-500/50' };
+  return <div className="flex justify-center"><div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full ${map[color] || 'bg-slate-600 shadow-slate-500/30'} border-2 border-white/40 shadow-[0_0_12px_currentColor]`} /></div>;
 }
 
 const EMOJI_LIST = ['😂','🤣','💀','🤡','😭','😈','👁️','🫠','🤌','🗿','🍵','🥱','🙏','🫡','🤯','🪿','🎭','🦧','🐉','💩','👻','🤖','👾','🎲'];
 
 function EmojiBar({ onSend }: { onSend: (emoji: string) => void }) {
   return (
-    <div className="flex-shrink-0 overflow-x-auto scrollbar-thin border-t border-gold/5 bg-felt-dark/60">
-      <div className="flex gap-1 px-2 py-1 min-w-max justify-center">
+    <div className="flex-shrink-0 overflow-x-auto scrollbar-thin">
+      <div className="flex gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 min-w-max justify-center">
         {EMOJI_LIST.map(e => (
           <button key={e} onClick={() => onSend(e)}
-            className="text-lg hover:scale-125 active:scale-90 transition-transform flex-shrink-0 p-0.5"
+            className="text-lg sm:text-xl hover:scale-125 active:scale-90 transition-all flex-shrink-0 p-1 sm:p-1.5 min-w-[32px] sm:min-w-[38px] text-center rounded-lg hover:bg-white/5"
           >{e}</button>
         ))}
       </div>
